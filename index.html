@@ -1,917 +1,575 @@
 
-"use strict";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101319">
+  <title>Sleeper Command Center</title>
 
-const SEASON = "2026";
-const API = "https://api.sleeper.app/v1";
-const $ = id => document.getElementById(id);
-
-const loadButton = $("loadButton");
-
-let leagueData = [];
-let playerDatabase = null;
-let loadedUsername = "";
-let requestNumber = 0;
-
-const STATUS_ORDER = {
-  Starting: 0,
-  Bench: 1,
-  IR: 2,
-  Taxi: 3
-};
-
-// ------------------------------
-// API CONNECTION
-// ------------------------------
-
-async function getData(url) {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      `Sleeper API error: ${response.status}`
-    );
-  }
-
-  return response.json();
-}
-
-// ------------------------------
-// LEAGUE CLASSIFICATION
-// ------------------------------
-
-function leagueType(league) {
-  const type = Number(league.settings?.type);
-
-  return ({
-    0: "Redraft",
-    1: "Keeper",
-    2: "Dynasty",
-    3: "Chopped"
-  })[type] || "Other";
-}
-
-function isEmptyLeague(rosters) {
-  return (
-    Array.isArray(rosters) &&
-    rosters.length > 0 &&
-    rosters.every(roster =>
-      Array.isArray(roster.players) &&
-      roster.players.length === 0
-    )
-  );
-}
-
-// ------------------------------
-// PLAYER DATABASE
-// ------------------------------
-
-async function getPlayerDatabase() {
-  if (playerDatabase) {
-    return playerDatabase;
-  }
-
-  const database = await getData(
-    `${API}/players/nfl`
-  );
-
-  if (
-    !database ||
-    typeof database !== "object" ||
-    Array.isArray(database)
-  ) {
-    throw new Error(
-      "Invalid player directory response"
-    );
-  }
-
-  playerDatabase = database;
-  return database;
-}
-
-// ------------------------------
-// INJURY HELPERS
-// ------------------------------
-
-function normalizedInjury(injury) {
-  return String(injury ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function hasInjuryDesignation(player) {
-  const injury = normalizedInjury(player.injury);
-
-  return ![
-    "",
-    "—",
-    "null",
-    "healthy",
-    "active"
-  ].includes(injury);
-}
-
-function hasInjuryAlert(player) {
-  return (
-    player.starting > 0 &&
-    hasInjuryDesignation(player)
-  );
-}
-
-function injuryStatusClass(injury) {
-  const value = normalizedInjury(injury);
-
-  if (
-    ["out", "o", "ir", "injured reserve"].includes(value)
-  ) {
-    return "injury-out";
-  }
-
-  if (
-    ["questionable", "q"].includes(value)
-  ) {
-    return "injury-questionable";
-  }
-
-  if (
-    ["doubtful", "d"].includes(value)
-  ) {
-    return "injury-doubtful";
-  }
-
-  if (
-    ["", "—", "null", "healthy", "active"].includes(value)
-  ) {
-    return "injury-healthy";
-  }
-
-  return "injury-other";
-}
-
-// ------------------------------
-// ROSTER STATUS HELPERS
-// ------------------------------
-
-function rosterStatusClass(status) {
-  return ({
-    Starting: "status-starting",
-    Bench: "status-bench",
-    IR: "status-ir",
-    Taxi: "status-taxi"
-  })[status] || "";
-}
-
-function sortedPlayerLeagues(player) {
-  return [...player.leagues].sort((a, b) => {
-    const orderA =
-      STATUS_ORDER[a.status] ?? 99;
-
-    const orderB =
-      STATUS_ORDER[b.status] ?? 99;
-
-    return (
-      orderA - orderB ||
-      a.name.localeCompare(b.name)
-    );
-  });
-}
-
-// ------------------------------
-// RESET DASHBOARD
-// ------------------------------
-
-function clearResults() {
-  leagueData = [];
-
-  const numberIds = [
-    "leagueCount",
-    "playerCount",
-    "uniqueCount",
-    "starterCount",
-    "benchCount",
-    "reserveCount",
-    "taxiCount",
-    "injuredStarterCount",
-    "affectedLineupCount"
-  ];
-
-  for (const id of numberIds) {
-    $(id).textContent = "--";
-  }
-
-  $("playerTableBody").replaceChildren();
-  $("mobilePlayerCards").replaceChildren();
-
-  $("playerStatus").textContent =
-    "Load leagues to see your players.";
-
-  $("emptyLeagueStatus").textContent =
-    "Load leagues to see filter results.";
-}
-
-// ------------------------------
-// LOAD USER AND LEAGUES
-// ------------------------------
-
-async function loadLeagues() {
-  const username =
-    $("sleeperUsername").value.trim();
-
-  if (!username) {
-    $("status").textContent =
-      "Please enter a Sleeper username.";
-    return;
-  }
-
-  const currentRequest = ++requestNumber;
-
-  clearResults();
-  loadedUsername = "";
-
-  loadButton.disabled = true;
-  loadButton.textContent = "Loading...";
-
-  $("status").textContent =
-    `Looking up ${username}...`;
-
-  try {
-    const user = await getData(
-      `${API}/user/${encodeURIComponent(username)}`
-    );
-
-    if (currentRequest !== requestNumber) return;
-
-    if (!user?.user_id) {
-      throw new Error(
-        "Sleeper username not found. Check spelling."
-      );
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101319;
+      --panel: #1b2029;
+      --border: #303642;
+      --text: #f5f6fa;
+      --muted: #a0a7b5;
+      --accent: #9b91f6;
+      --green: #7fc9a4;
+      --blue: #8ab4e8;
+      --red: #f08080;
+      --orange: #f0ad65;
+      --purple: #b9a1f7;
     }
 
-    const userId = String(user.user_id);
+    * { box-sizing: border-box; }
 
-    const leagues = await getData(
-      `${API}/user/${userId}/leagues/nfl/${SEASON}`
-    );
-
-    if (currentRequest !== requestNumber) return;
-
-    if (!Array.isArray(leagues)) {
-      throw new Error(
-        "Unexpected league response."
-      );
+    body {
+      margin: 0 auto;
+      max-width: 1320px;
+      min-height: 100vh;
+      padding: 28px;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
     }
 
-    $("status").textContent =
-      `Found ${leagues.length} leagues. Loading rosters...`;
-
-    const results = await Promise.allSettled(
-      leagues.map(async league => {
-        const rosters = await getData(
-          `${API}/league/${league.league_id}/rosters`
-        );
-
-        if (!Array.isArray(rosters)) {
-          throw new Error(
-            "Invalid roster response"
-          );
-        }
-
-        const myRoster = rosters.find(roster =>
-          String(roster.owner_id) === userId ||
-          (roster.co_owners || []).some(
-            id => String(id) === userId
-          )
-        );
-
-        return {
-          league,
-          myRoster,
-          empty: isEmptyLeague(rosters)
-        };
-      })
-    );
-
-    if (currentRequest !== requestNumber) return;
-
-    leagueData = results.map((result, index) =>
-      result.status === "fulfilled"
-        ? result.value
-        : {
-            league: leagues[index],
-            failed: true
-          }
-    );
-
-    loadedUsername = username;
-
-    const failures = leagueData.filter(
-      item => item.failed
-    ).length;
-
-    $("status").textContent =
-      `Loaded ${leagues.length - failures} of ` +
-      `${leagues.length} leagues for ${username}. ` +
-      `${failures} roster requests failed.`;
-
-    renderDashboard();
-
-    const hasPlayers = leagueData.some(item =>
-      item.myRoster &&
-      Array.isArray(item.myRoster.players) &&
-      item.myRoster.players.length > 0
-    );
-
-    if (hasPlayers) {
-      $("playerStatus").textContent =
-        "Loading player names and injuries...";
-
-      try {
-        await getPlayerDatabase();
-
-        if (currentRequest !== requestNumber) return;
-
-        renderDashboard();
-      } catch (error) {
-        if (currentRequest !== requestNumber) return;
-
-        console.error(
-          "Player directory error:",
-          error
-        );
-
-        renderDashboard();
-
-        $("playerStatus").textContent =
-          `Player directory unavailable: ` +
-          `${error.message}. Showing player IDs. ` +
-          `Injury alerts cannot be calculated.`;
-      }
+    h1 {
+      font-size: clamp(23px, 3vw, 30px);
+      letter-spacing: -0.6px;
+      margin: 0;
     }
-  } catch (error) {
-    if (currentRequest !== requestNumber) return;
 
-    clearResults();
-
-    $("status").textContent =
-      `Error: ${error.message}`;
-
-    console.error(error);
-  } finally {
-    if (currentRequest === requestNumber) {
-      loadButton.disabled = false;
-      loadButton.textContent = "Load My Leagues";
+    h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
     }
-  }
-}
 
-// ------------------------------
-// FILTER SELECTED LEAGUES
-// ------------------------------
+    p { color: var(--muted); }
 
-function selectedLeagues() {
-  const selectedTypes = new Set(
-    [
-      ...document.querySelectorAll(
-        "#baseFilters input:checked"
-      )
-    ].map(input => input.value)
-  );
+    .eyebrow {
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 1.3px;
+      font-weight: 700;
+    }
 
-  const excludeEmpty =
-    $("excludeEmptyLeagues").checked;
+    .subtitle { margin: 3px 0 22px; }
 
-  const bestBallOnly =
-    $("bestBallOnly").checked;
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 18px;
+      margin: 18px 0;
+    }
 
-  return leagueData.filter(item =>
-    !item.failed &&
-    (!excludeEmpty || !item.empty) &&
-    selectedTypes.has(
-      leagueType(item.league)
-    ) &&
-    (
-      !bestBallOnly ||
-      Number(
-        item.league.settings?.best_ball
-      ) === 1
-    )
-  );
-}
+    .account {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
 
-// ------------------------------
-// BUILD PLAYER EXPOSURE
-// ------------------------------
+    .field {
+      flex: 1;
+      min-width: 200px;
+    }
 
-function renderDashboard() {
-  if (!loadedUsername) return;
+    .field label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 7px;
+    }
 
-  const included = selectedLeagues();
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #121720;
+      color: var(--text);
+      padding: 12px;
+      font-size: 16px;
+      min-height: 46px;
+    }
 
-  const emptyCount = leagueData.filter(
-    item => !item.failed && item.empty
-  ).length;
+    button {
+      background: #7769df;
+      border: 0;
+      color: white;
+      border-radius: 10px;
+      padding: 12px 18px;
+      min-height: 44px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
 
-  const failures = leagueData.filter(
-    item => item.failed
-  ).length;
+    button:hover { background: #6658cc; }
+    button:disabled { opacity: 0.6; cursor: wait; }
 
-  const missingRosters = included.filter(
-    item => !item.myRoster
-  ).length;
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
 
-  const exposure = new Map();
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
 
-  const totals = {
-    player: 0,
-    start: 0,
-    bench: 0,
-    reserve: 0,
-    taxi: 0
-  };
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 17px;
+    }
 
-  for (const { league, myRoster } of included) {
-    if (!myRoster) continue;
+    .number {
+      font-size: 29px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
 
-    const starters = new Set(
-      (myRoster.starters || [])
-        .filter(id => id && id !== "0")
-        .map(String)
-    );
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+    }
 
-    const reserve = new Set(
-      (myRoster.reserve || []).map(String)
-    );
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 10px 0;
+    }
 
-    const taxi = new Set(
-      (myRoster.taxi || []).map(String)
-    );
+    .filters {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
 
-    for (const rawId of myRoster.players || []) {
-      const id = String(rawId);
+    .filters label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: #d8dbe3;
+      cursor: pointer;
+      min-height: 34px;
+    }
 
-      if (!id || id === "0") continue;
+    .filters input {
+      accent-color: var(--accent);
+      width: 17px;
+      height: 17px;
+    }
 
-      const status = starters.has(id)
-        ? "Starting"
-        : reserve.has(id)
-        ? "IR"
-        : taxi.has(id)
-        ? "Taxi"
-        : "Bench";
+    .filter-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 12px 0 6px;
+    }
 
-      if (!exposure.has(id)) {
-        exposure.set(id, {
-          id,
-          owned: 0,
-          starting: 0,
-          bench: 0,
-          reserve: 0,
-          taxi: 0,
-          leagues: []
-        });
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 24px 0 10px;
+    }
+
+    .toolbar h2 { margin: 0; }
+    .search { width: min(100%, 360px); }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 780px;
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 12px;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+
+    .player-button {
+      background: none;
+      color: var(--accent);
+      text-align: left;
+      padding: 0;
+      min-height: 36px;
+      font-weight: 600;
+    }
+
+    .player-button:hover { background: none; }
+
+    .detail-cell { background: #202632; }
+
+    .league-list {
+      display: grid;
+      gap: 8px;
+      padding: 6px 0;
+    }
+
+    .league-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .league-item span:first-child {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .muted { color: var(--muted); }
+
+    /* Roster status colors */
+    .status-starting { color: var(--green); }
+    .status-bench { color: var(--blue); }
+    .status-ir { color: var(--red); }
+    .status-taxi { color: var(--purple); }
+
+    /* Injury status colors */
+    .injury-out,
+    .injury-ir {
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .injury-questionable,
+    .injury-doubtful {
+      color: var(--orange);
+      font-weight: 600;
+    }
+
+    .injury-other {
+      color: #e2c17b;
+      font-weight: 600;
+    }
+
+    .injury-healthy { color: var(--muted); }
+
+    .alert-number { color: var(--red); }
+    .affected-number { color: var(--orange); }
+
+    /* Mobile player cards */
+    #mobilePlayerCards { display: none; }
+
+    .player-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 15px;
+    }
+
+    .card-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      text-align: left;
+      background: transparent;
+      padding: 0;
+    }
+
+    .card-header:hover { background: transparent; }
+
+    .card-title {
+      font-weight: 650;
+      font-size: 15px;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .card-owned {
+      font-size: 22px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 13px;
+    }
+
+    .card-stat-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .card-stat-value {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .card-details {
+      border-top: 1px solid var(--border);
+      margin-top: 13px;
+      padding-top: 12px;
+    }
+
+    .card-details[hidden],
+    .detail-row[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 17px 13px; }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      const player = exposure.get(id);
-      player.owned++;
+      .number { font-size: 25px; }
 
-      const playerKey = ({
-        Starting: "starting",
-        Bench: "bench",
-        IR: "reserve",
-        Taxi: "taxi"
-      })[status];
+      .account { display: block; }
 
-      player[playerKey]++;
-
-      player.leagues.push({
-        name: league.name || "Unnamed league",
-        status
-      });
-
-      totals.player++;
-
-      const totalKey = ({
-        Starting: "start",
-        Bench: "bench",
-        IR: "reserve",
-        Taxi: "taxi"
-      })[status];
-
-      totals[totalKey]++;
-    }
-  }
-
-  // Update portfolio totals.
-  const numbers = {
-    leagueCount: included.length,
-    playerCount: totals.player,
-    uniqueCount: exposure.size,
-    starterCount: totals.start,
-    benchCount: totals.bench,
-    reserveCount: totals.reserve,
-    taxiCount: totals.taxi
-  };
-
-  for (const [id, value] of Object.entries(numbers)) {
-    $(id).textContent = value;
-  }
-
-  $("emptyLeagueStatus").textContent =
-    `${emptyCount} empty league(s) detected. ` +
-    `Empty-league exclusion is ` +
-    `${$("excludeEmptyLeagues").checked ? "on" : "off"}. ` +
-    `${failures} failed request(s). ` +
-    `${missingRosters} selected league(s) ` +
-    `without your roster.`;
-
-  // Match player IDs to names and injuries.
-  const players = [...exposure.values()]
-    .map(player => {
-      const info =
-        playerDatabase?.[player.id] || {};
-
-      return {
-        ...player,
-        name:
-          info.full_name ||
-          [info.first_name, info.last_name]
-            .filter(Boolean)
-            .join(" ") ||
-          `Player ID ${player.id}`,
-        position: info.position || "—",
-        team: info.team || "—",
-        injury: info.injury_status || "—"
-      };
-    })
-    .sort((a, b) =>
-      b.owned - a.owned ||
-      a.name.localeCompare(b.name)
-    );
-
-  // Calculate injured starters.
-  if (playerDatabase) {
-    const injuredStarters =
-      players.filter(hasInjuryAlert);
-
-    const affectedLineups =
-      injuredStarters.reduce(
-        (sum, player) =>
-          sum + player.starting,
-        0
-      );
-
-    $("injuredStarterCount").textContent =
-      injuredStarters.length;
-
-    $("affectedLineupCount").textContent =
-      affectedLineups;
-  } else {
-    $("injuredStarterCount").textContent = "--";
-    $("affectedLineupCount").textContent = "--";
-  }
-
-  // Search and health filters.
-  const query = $("playerSearch").value
-    .trim()
-    .toLowerCase();
-
-  const includeHealthy =
-    $("includeHealthy").checked;
-
-  const alertsOnly =
-    $("injuryAlertsOnly").checked;
-
-  const filtered = players.filter(player => {
-    const matchesSearch =
-      `${player.name} ${player.position} ${player.team}`
-        .toLowerCase()
-        .includes(query);
-
-    const matchesInjury =
-      includeHealthy ||
-      hasInjuryDesignation(player);
-
-    const matchesAlert =
-      !alertsOnly ||
-      (
-        playerDatabase &&
-        hasInjuryAlert(player)
-      );
-
-    return (
-      matchesSearch &&
-      matchesInjury &&
-      matchesAlert
-    );
-  });
-
-  if (playerDatabase) {
-    $("playerStatus").textContent =
-      `Showing ${filtered.length} of ` +
-      `${players.length} unique players ` +
-      `across ${included.length} selected leagues.`;
-  } else {
-    $("playerStatus").textContent =
-      `Player directory unavailable or loading. ` +
-      `Injury filters require player data.`;
-  }
-
-  renderPlayers(filtered);
-}
-
-// ------------------------------
-// SAFE TEXT DISPLAY
-// ------------------------------
-
-function appendText(parent, tag, text, className) {
-  const node = document.createElement(tag);
-
-  node.textContent = String(text);
-
-  if (className) {
-    node.className = className;
-  }
-
-  parent.appendChild(node);
-  return node;
-}
-
-// ------------------------------
-// EXPANDED LEAGUE BREAKDOWN
-// ------------------------------
-
-function leagueDetails(parent, player) {
-  const list = document.createElement("div");
-  list.className = "league-list";
-
-  for (
-    const league of sortedPlayerLeagues(player)
-  ) {
-    const item = document.createElement("div");
-    item.className = "league-item";
-
-    appendText(
-      item,
-      "span",
-      league.name
-    );
-
-    appendText(
-      item,
-      "span",
-      league.status,
-      rosterStatusClass(league.status)
-    );
-
-    list.appendChild(item);
-  }
-
-  parent.appendChild(list);
-}
-
-// ------------------------------
-// DESKTOP TABLE + MOBILE CARDS
-// ------------------------------
-
-function renderPlayers(players) {
-  const tbody = $("playerTableBody");
-  const cards = $("mobilePlayerCards");
-
-  tbody.replaceChildren();
-  cards.replaceChildren();
-
-  for (const player of players) {
-    // Desktop player row.
-    const row = document.createElement("tr");
-
-    const nameCell = document.createElement("td");
-
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "player-button";
-    toggle.textContent = `▸ ${player.name}`;
-    toggle.setAttribute("aria-expanded", "false");
-
-    nameCell.appendChild(toggle);
-    row.appendChild(nameCell);
-
-    const values = [
-      `${player.position} · ${player.team}`,
-      player.owned,
-      player.starting,
-      player.bench,
-      player.reserve,
-      player.taxi,
-      player.injury
-    ];
-
-    values.forEach((value, index) => {
-      const cell = appendText(row, "td", value);
-
-      if (index === 6) {
-        cell.className =
-          injuryStatusClass(player.injury);
+      .account button {
+        width: 100%;
+        margin-top: 10px;
       }
-    });
 
-    tbody.appendChild(row);
+      .table-wrap { display: none; }
 
-    // Hidden desktop league breakdown.
-    const detailRow = document.createElement("tr");
-    detailRow.className = "detail-row";
-    detailRow.hidden = true;
+      #mobilePlayerCards {
+        display: grid;
+        gap: 11px;
+      }
 
-    const detailCell = document.createElement("td");
-    detailCell.colSpan = 8;
-    detailCell.className = "detail-cell";
-
-    leagueDetails(detailCell, player);
-
-    detailRow.appendChild(detailCell);
-    tbody.appendChild(detailRow);
-
-    toggle.addEventListener("click", () => {
-      detailRow.hidden = !detailRow.hidden;
-
-      toggle.textContent =
-        `${detailRow.hidden ? "▸" : "▾"} ${player.name}`;
-
-      toggle.setAttribute(
-        "aria-expanded",
-        String(!detailRow.hidden)
-      );
-    });
-
-    // Mobile player card.
-    const card = document.createElement("article");
-    card.className = "player-card";
-
-    const header = document.createElement("button");
-    header.type = "button";
-    header.className = "card-header";
-    header.setAttribute("aria-expanded", "false");
-
-    const left = document.createElement("div");
-
-    appendText(
-      left,
-      "div",
-      player.name,
-      "card-title"
-    );
-
-    appendText(
-      left,
-      "div",
-      `${player.position} · ${player.team}`,
-      "card-sub"
-    );
-
-    const injuryLabel = appendText(
-      left,
-      "div",
-      player.injury === "—"
-        ? "No injury designation"
-        : player.injury,
-      "card-sub"
-    );
-
-    injuryLabel.classList.add(
-      injuryStatusClass(player.injury)
-    );
-
-    const right = document.createElement("div");
-
-    appendText(
-      right,
-      "div",
-      player.owned,
-      "card-owned"
-    );
-
-    appendText(
-      right,
-      "div",
-      "Owned · tap to expand",
-      "card-sub"
-    );
-
-    header.append(left, right);
-    card.appendChild(header);
-
-    // Mobile roster counts.
-    const stats = document.createElement("div");
-    stats.className = "card-stats";
-
-    for (const [label, value, status] of [
-      ["Start", player.starting, "Starting"],
-      ["Bench", player.bench, "Bench"],
-      ["IR", player.reserve, "IR"],
-      ["Taxi", player.taxi, "Taxi"]
-    ]) {
-      const stat = document.createElement("div");
-
-      appendText(
-        stat,
-        "div",
-        label,
-        "card-stat-label"
-      );
-
-      const statValue = appendText(
-        stat,
-        "div",
-        value,
-        "card-stat-value"
-      );
-
-      statValue.classList.add(
-        rosterStatusClass(status)
-      );
-
-      stats.appendChild(stat);
+      .search { width: 100%; }
+      .panel { padding: 14px; }
+      .league-item { font-size: 12px; }
     }
+  </style>
+</head>
 
-    card.appendChild(stats);
+<body>
+  <div class="eyebrow">FANTASY PORTFOLIO</div>
+  <h1>Sleeper Command Center</h1>
+  <p class="subtitle">
+    Your leagues. Your players. One dashboard.
+  </p>
 
-    // Mobile expanded leagues.
-    const details = document.createElement("div");
-    details.className = "card-details";
-    details.hidden = true;
+  <!-- Account selection -->
+  <section class="panel account" aria-label="Account">
+    <div class="field">
+      <label for="sleeperUsername">Sleeper username</label>
+      <input
+        id="sleeperUsername"
+        type="text"
+        value="nytman"
+        autocomplete="off"
+        spellcheck="false"
+      >
+    </div>
+    <button id="loadButton" type="button">
+      Load My Leagues
+    </button>
+  </section>
 
-    leagueDetails(details, player);
-    card.appendChild(details);
+  <p id="status" class="status" role="status">
+    Enter a username and load leagues.
+  </p>
 
-    header.addEventListener("click", () => {
-      details.hidden = !details.hidden;
+  <!-- Portfolio totals -->
+  <section class="stats" aria-label="Portfolio totals">
+    <div class="stat">
+      <div id="leagueCount" class="number">--</div>
+      <div class="label">Included leagues</div>
+    </div>
+    <div class="stat">
+      <div id="playerCount" class="number">--</div>
+      <div class="label">Roster spots</div>
+    </div>
+    <div class="stat">
+      <div id="uniqueCount" class="number">--</div>
+      <div class="label">Unique players</div>
+    </div>
+    <div class="stat">
+      <div id="starterCount" class="number">--</div>
+      <div class="label">Starting</div>
+    </div>
+    <div class="stat">
+      <div id="benchCount" class="number">--</div>
+      <div class="label">Bench</div>
+    </div>
+    <div class="stat">
+      <div id="reserveCount" class="number">--</div>
+      <div class="label">IR</div>
+    </div>
+    <div class="stat">
+      <div id="taxiCount" class="number">--</div>
+      <div class="label">Taxi</div>
+    </div>
+  </section>
 
-      header.setAttribute(
-        "aria-expanded",
-        String(!details.hidden)
-      );
-    });
+  <!-- League filters -->
+  <section class="panel" aria-label="League filters">
+    <h2>League Filters</h2>
 
-    cards.appendChild(card);
-  }
-}
+    <div class="filters">
+      <label>
+        <input
+          id="excludeEmptyLeagues"
+          type="checkbox"
+          checked
+        >
+        Exclude empty leagues
+      </label>
+    </div>
 
-// ------------------------------
-// EVENT LISTENERS
-// ------------------------------
+    <div class="filter-title">League structure</div>
 
-// Load account.
-loadButton.addEventListener(
-  "click",
-  loadLeagues
-);
+    <div class="filters" id="baseFilters">
+      <label>
+        <input type="checkbox" value="Redraft" checked>
+        Redraft
+      </label>
+      <label>
+        <input type="checkbox" value="Keeper" checked>
+        Keeper
+      </label>
+      <label>
+        <input type="checkbox" value="Dynasty" checked>
+        Dynasty
+      </label>
+      <label>
+        <input type="checkbox" value="Chopped" checked>
+        Chopped
+      </label>
+      <label>
+        <input type="checkbox" value="Other" checked>
+        Other
+      </label>
+    </div>
 
-// Reset old results when changing users.
-$("sleeperUsername").addEventListener(
-  "input",
-  () => {
-    if (
-      loadedUsername &&
-      $("sleeperUsername").value.trim() !==
-        loadedUsername
-    ) {
-      ++requestNumber;
-      loadedUsername = "";
+    <div class="filter-title">Additional format</div>
 
-      clearResults();
+    <div class="filters">
+      <label>
+        <input id="bestBallOnly" type="checkbox">
+        Best Ball only
+      </label>
+    </div>
 
-      loadButton.disabled = false;
-      loadButton.textContent = "Load My Leagues";
+    <p id="emptyLeagueStatus" class="status">
+      Load leagues to see filter results.
+    </p>
+  </section>
 
-      $("status").textContent =
-        "Username changed. Click Load My Leagues " +
-        "to load this account.";
-    }
-  }
-);
+  <!-- Injury filters -->
+  <section class="panel" aria-label="Injury filters">
+    <h2>Player Health Filters</h2>
 
-// League filters.
-for (const input of document.querySelectorAll(
-  "#baseFilters input, #bestBallOnly, #excludeEmptyLeagues"
-)) {
-  input.addEventListener(
-    "change",
-    renderDashboard
-  );
-}
+    <div class="filters">
+      <label>
+        <input id="includeHealthy" type="checkbox" checked>
+        Include healthy players
+      </label>
+    </div>
 
-// Player search.
-$("playerSearch").addEventListener(
-  "input",
-  renderDashboard
-);
+    <p class="status">
+      Uncheck to show only players with an injury designation.
+    </p>
+  </section>
 
-// Include healthy players.
-$("includeHealthy").addEventListener(
-  "change",
-  renderDashboard
-);
+  <!-- Lineup health -->
+  <section class="panel" aria-label="Lineup health">
+    <h2>Lineup Health</h2>
 
-// Injury alerts only.
-$("injuryAlertsOnly").addEventListener(
-  "change",
-  renderDashboard
-);
+    <div class="stats">
+      <div class="stat">
+        <div id="injuredStarterCount"
+          class="number alert-number">--</div>
+        <div class="label">Injured players starting</div>
+      </div>
+
+      <div class="stat">
+        <div id="affectedLineupCount"
+          class="number affected-number">--</div>
+        <div class="label">Affected lineup spots</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <label>
+        <input id="injuryAlertsOnly" type="checkbox">
+        Injury alerts only
+      </label>
+    </div>
+
+    <p class="status">
+      Show injured players starting in at least one selected league.
+    </p>
+  </section>
+
+  <!-- Player exposure -->
+  <div class="toolbar">
+    <h2>Player Exposure</h2>
+    <input
+      class="search"
+      id="playerSearch"
+      type="text"
+      placeholder="Search players, positions or teams"
+      aria-label="Search players"
+    >
+  </div>
+
+  <p id="playerStatus" class="status">
+    Load leagues to see your players.
+  </p>
+
+  <!-- Desktop table -->
+  <div class="table-wrap">
+    <table id="playerTable">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Position / Team</th>
+          <th>Owned</th>
+          <th>Start</th>
+          <th>Bench</th>
+          <th>IR</th>
+          <th>Taxi</th>
+          <th>Injury</th>
+        </tr>
+      </thead>
+      <tbody id="playerTableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- iPhone cards -->
+  <div id="mobilePlayerCards"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
