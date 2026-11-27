@@ -889,6 +889,7 @@ function lineupSlots(item) {
 // CURRENT-WEEK SUGGESTION ENGINE
 // -----------------------------------
 
+
 function buildSuggestions(item) {
   if (
     rosterMode !== "current" ||
@@ -903,15 +904,13 @@ function buildSuggestions(item) {
   }
 
   const roster = item.myRoster;
-  const slots = lineupSlots(item).map(
-    slot => ({...slot})
-  );
+  const slots = lineupSlots(item).map(s => ({...s}));
+  const originalSlots = slots.map(s => ({...s}));
 
   const suggestions = [];
 
   const active = new Set(
-    slots.map(s => s.id)
-      .filter(id => id && id !== "0")
+    slots.map(s => s.id).filter(id => id && id !== "0")
   );
 
   const reserve = new Set(
@@ -934,6 +933,10 @@ function buildSuggestions(item) {
   const changedSlots = new Set();
   const usedBench = new Set();
 
+  // A player covered by an actionable recommendation
+  // should not receive a duplicate Questionable alert.
+  const coveredQuestionable = new Set();
+
   function gameTiming(id) {
     return timing(
       playerInfo(id).team,
@@ -941,7 +944,13 @@ function buildSuggestions(item) {
     );
   }
 
-  function safeReplacement(id) {
+  function isQuestionable(id) {
+    return injuryPriority(
+      playerInfo(id).injury
+    ) === "questionable";
+  }
+
+  function safePlayer(id) {
     const info = playerInfo(id);
 
     return NFL_TEAMS.has(info.team) &&
@@ -949,44 +958,34 @@ function buildSuggestions(item) {
       gameTiming(id) === "upcoming";
   }
 
-  function add(type, title, detail, meta) {
+  function add(type, title, detail, meta, ids = []) {
+    const questionableIds = [
+      ...new Set(ids.filter(isQuestionable))
+    ];
+
+    // The recommendation itself is primary.
+    // Questionable is secondary metadata.
+    for (const id of questionableIds) {
+      coveredQuestionable.add(id);
+    }
+
     suggestions.push({
-      type,title,detail,meta
+      type,
+      title,
+      detail,
+      meta,
+      questionableIds,
+      questionableNames: questionableIds.map(
+        id => playerInfo(id).name
+      )
     });
   }
 
-  // 1. Availability warnings.
-  // Questionable remains separate and orange.
-  for (const slot of slots) {
-    if (!slot.id || slot.id === "0") continue;
+  // ---------------------------------
+  // 1. Coordinated projected-points
+  //    recommendations
+  // ---------------------------------
 
-    const info = playerInfo(slot.id);
-    const priority = injuryPriority(info.injury);
-
-    if (gameTiming(slot.id) !== "upcoming") {
-      continue;
-    }
-
-    if (priority === "high") {
-      add(
-        "availability",
-        info.name,
-        `${String(info.injury).toUpperCase()} · ` +
-          `${slot.slot}`,
-        shortTime(info.team,currentSchedule)
-      );
-    } else if (priority === "questionable") {
-      add(
-        "questionable",
-        info.name,
-        `QUESTIONABLE · ${slot.slot}`,
-        shortTime(info.team,currentSchedule)
-      );
-    }
-  }
-
-  // 2. Coordinated projected-points changes.
-  // Every swap must gain at least MIN_GAIN.
   while (true) {
     let best = null;
 
@@ -1003,20 +1002,19 @@ function buildSuggestions(item) {
 
       for (const candidateId of bench) {
         if (usedBench.has(candidateId)) continue;
-        if (!safeReplacement(candidateId)) continue;
+        if (!safePlayer(candidateId)) continue;
 
-        if (!eligibleFor(candidateId,slot.slot)) {
+        if (!eligibleFor(candidateId, slot.slot)) {
           continue;
         }
 
-        const candidate =
-          projectedPoints(candidateId);
-
+        const candidate = projectedPoints(candidateId);
         if (candidate == null) continue;
 
         const gain = candidate - current;
 
-        // The threshold applies to EACH swap.
+        // Every individual recommendation must
+        // meet the 2.5 PPR minimum.
         if (gain < MIN_GAIN) continue;
 
         if (
@@ -1044,30 +1042,26 @@ function buildSuggestions(item) {
     usedBench.add(best.candidateId);
     changedSlots.add(best.slot.index);
 
-    const incoming = playerInfo(
-      best.candidateId
-    );
-    const outgoing = playerInfo(
-      best.currentId
-    );
+    const incoming = playerInfo(best.candidateId);
+    const outgoing = playerInfo(best.currentId);
 
     add(
       "points",
       `${incoming.name} → ${best.slot.slot}`,
-      `Start ${incoming.name}; ` +
-        `bench ${outgoing.name}.`,
+      `Start ${incoming.name}; bench ${outgoing.name}.`,
       `${formatPoints(best.candidate)} vs ` +
-        `${formatPoints(best.current)} PPR · ` +
-        `+${formatPoints(best.gain)}`
+      `${formatPoints(best.current)} PPR · ` +
+      `+${formatPoints(best.gain)}`,
+      [best.candidateId, best.currentId]
     );
 
-    // Update the proposed lineup so subsequent
-    // recommendations cannot reuse this slot.
     best.slot.id = best.candidateId;
   }
 
-  // 3. FLEX / SUPER_FLEX optimization.
-  // Do not touch positions used in points swaps.
+  // ---------------------------------
+  // 2. FLEX / SUPER_FLEX recommendations
+  // ---------------------------------
+
   const usedFlexSlots = new Set();
 
   for (const flex of slots) {
@@ -1081,19 +1075,15 @@ function buildSuggestions(item) {
       continue;
     }
 
-    if (gameTiming(flex.id) !== "upcoming") {
-      continue;
-    }
+    if (!safePlayer(flex.id)) continue;
 
     const flexPlayer = playerInfo(flex.id);
     const flexGame = scheduleInfo(
-      flexPlayer.team,currentSchedule
+      flexPlayer.team,
+      currentSchedule
     );
 
-    const flexTime = Date.parse(
-      flexGame.date || ""
-    );
-
+    const flexTime = Date.parse(flexGame.date || "");
     if (!Number.isFinite(flexTime)) continue;
 
     let best = null;
@@ -1109,31 +1099,27 @@ function buildSuggestions(item) {
         continue;
       }
 
-      if (gameTiming(fixed.id) !== "upcoming") {
-        continue;
-      }
+      // No locked or high-risk players
+      // are eligible for cosmetic FLEX swaps.
+      if (!safePlayer(fixed.id)) continue;
 
       if (
-        !eligibleFor(fixed.id,flex.slot) ||
-        !eligibleFor(flex.id,fixed.slot)
+        !eligibleFor(fixed.id, flex.slot) ||
+        !eligibleFor(flex.id, fixed.slot)
       ) {
         continue;
       }
 
       const fixedPlayer = playerInfo(fixed.id);
-
       const fixedGame = scheduleInfo(
-        fixedPlayer.team,currentSchedule
+        fixedPlayer.team,
+        currentSchedule
       );
 
-      const fixedTime = Date.parse(
-        fixedGame.date || ""
-      );
-
+      const fixedTime = Date.parse(fixedGame.date || "");
       if (!Number.isFinite(fixedTime)) continue;
 
       const difference = fixedTime - flexTime;
-
       if (difference <= 0) continue;
 
       if (
@@ -1153,14 +1139,15 @@ function buildSuggestions(item) {
     const earlier = playerInfo(flex.id);
     const later = best.fixedPlayer;
 
+    // This single recommendation covers
+    // Questionable players on EITHER side.
     add(
       "flex",
       `${later.name} → ${flex.slot}`,
-      `Swap with ${earlier.name} ` +
-        `in ${best.fixed.slot}.`,
+      `Swap with ${earlier.name} in ${best.fixed.slot}.`,
       `${shortTime(earlier.team,currentSchedule)}` +
-        ` → ` +
-        `${shortTime(later.team,currentSchedule)}`
+      ` → ${shortTime(later.team,currentSchedule)}`,
+      [flex.id, best.fixed.id]
     );
 
     usedFlexSlots.add(flex.index);
@@ -1171,8 +1158,52 @@ function buildSuggestions(item) {
     best.fixed.id = oldFlexId;
   }
 
+  // ---------------------------------
+  // 3. Standalone availability warnings
+  // ---------------------------------
+  // These use ORIGINAL starters, not the
+  // proposed lineup after swaps.
+
+  for (const slot of originalSlots) {
+    if (!slot.id || slot.id === "0") continue;
+
+    const info = playerInfo(slot.id);
+    const priority = injuryPriority(info.injury);
+
+    if (gameTiming(slot.id) !== "upcoming") {
+      continue;
+    }
+
+    if (priority === "high") {
+      suggestions.push({
+        type:"availability",
+        title:info.name,
+        detail:
+          `${String(info.injury).toUpperCase()} · ` +
+          `${slot.slot}`,
+        meta:shortTime(info.team,currentSchedule),
+        questionableIds:[],
+        questionableNames:[]
+      });
+
+    } else if (
+      priority === "questionable" &&
+      !coveredQuestionable.has(slot.id)
+    ) {
+      suggestions.push({
+        type:"questionable",
+        title:info.name,
+        detail:`QUESTIONABLE · ${slot.slot}`,
+        meta:shortTime(info.team,currentSchedule),
+        questionableIds:[],
+        questionableNames:[]
+      });
+    }
+  }
+
   return suggestions;
 }
+
 
 // -----------------------------------
 // ACCOUNT LOADING
@@ -1756,16 +1787,42 @@ function renderSuggestions(items) {
         suggestion.title,"suggestion-name"
       );
 
-      const badge = {
-        availability:["ALERT","red"],
-        questionable:["QUESTIONABLE","orange"],
-        flex:["FLEX","yellow"],
-        points:["POINTS","yellow"]
-      }[suggestion.type];
+      
+const badge = {
+  availability:["ALERT","red"],
+  questionable:["QUESTIONABLE","orange"],
+  flex:["FLEX","yellow"],
+  points:["POINTS","yellow"]
+}[suggestion.type];
 
-      append(head,"span",badge[0],
-        `tag ${badge[1]}`
-      );
+const badges = append(
+  head,
+  "div",
+  "",
+  "tags"
+);
+
+// Primary recommendation badge.
+append(
+  badges,
+  "span",
+  badge[0],
+  `tag ${badge[1]}`
+);
+
+// Secondary injury badge.
+if (
+  suggestion.questionableIds &&
+  suggestion.questionableIds.length > 0
+) {
+  append(
+    badges,
+    "span",
+    "Q",
+    "tag orange"
+  );
+}
+
 
       append(row,"div",
         suggestion.detail,"suggestion-meta"
@@ -1774,6 +1831,22 @@ function renderSuggestions(items) {
       append(row,"div",
         suggestion.meta,"suggestion-note"
       );
+
+
+if (
+  suggestion.type !== "questionable" &&
+  suggestion.questionableNames?.length
+) {
+  append(
+    row,
+    "div",
+    `Questionable: ` +
+    suggestion.questionableNames.join(", ") +
+    " — monitor availability before kickoff.",
+    "suggestion-note orange"
+  );
+}
+
     }
 
     append(body,"p",
