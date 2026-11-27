@@ -1,420 +1,917 @@
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sleeper Command Center</title>
-  
-<style>
-  :root {
-    color-scheme: dark;
-    --bg: #101319;
-    --surface: #1b2029;
-    --border: #303642;
-    --text: #f5f6fa;
-    --muted: #a0a7b5;
-    --accent: #9b91f6;
-    --success: #7fc9a4;
+"use strict";
+
+const SEASON = "2026";
+const API = "https://api.sleeper.app/v1";
+const $ = id => document.getElementById(id);
+
+const loadButton = $("loadButton");
+
+let leagueData = [];
+let playerDatabase = null;
+let loadedUsername = "";
+let requestNumber = 0;
+
+const STATUS_ORDER = {
+  Starting: 0,
+  Bench: 1,
+  IR: 2,
+  Taxi: 3
+};
+
+// ------------------------------
+// API CONNECTION
+// ------------------------------
+
+async function getData(url) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `Sleeper API error: ${response.status}`
+    );
   }
 
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    width: 100%;
-    max-width: 1400px;
-    min-height: 100vh;
-    margin: 0 auto;
-    padding: 32px;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  h1 {
-    font-size: 26px;
-    font-weight: 650;
-    letter-spacing: -0.7px;
-    margin: 0 0 4px;
-  }
-
-  h2 {
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: -0.3px;
-    margin: 32px 0 16px;
-  }
-
-  p {
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  button {
-    background: #7769df;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 12px 18px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-
-  button:hover {
-    background: #6658cc;
-  }
-
-  button:disabled {
-    opacity: 0.6;
-    cursor: wait;
-  }
-
-  input {
-    max-width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text);
-    padding: 12px;
-    font-size: 16px;
-  }
-
-  input:focus-visible,
-  button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin: 24px 0;
-  }
-
-  .stat {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 20px;
-  }
-
-  .number {
-    font-size: 30px;
-    font-weight: 650;
-    letter-spacing: -1px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .label {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 4px;
-  }
-
-  #status,
-  #playerStatus,
-  #filterStatus {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 14px;
-  }
-
-  #playerSearch {
-    width: 100%;
-    margin: 0 0 16px;
-  }
-
-  #leagueFilters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  #leagueFilters label {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 12px;
-    color: var(--muted);
-  }
-
-  #leagueFilters input {
-    width: auto;
-    margin: 0;
-    accent-color: var(--accent);
-  }
-
-  #playerTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-
-  #playerTable th {
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 600;
-    text-align: left;
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-
-  #playerTable td {
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--border);
-    font-variant-numeric: tabular-nums;
-  }
-
-  #playerTable tbody tr:hover {
-    background: #202632;
-  }
-
-  #playerTable button {
-    color: var(--accent) !important;
-    font-weight: 500;
-    font-size: 13px;
-    min-height: 36px;
-  }
-
-  @media (max-width: 700px) {
-    body {
-      padding: 18px 14px;
-    }
-
-    h1 {
-      font-size: 22px;
-    }
-
-    .stats {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .stat {
-      padding: 16px;
-    }
-
-    .number {
-      font-size: 26px;
-    }
-
-    #loadButton {
-      width: 100%;
-      min-height: 44px;
-    }
-
-    #playerTable {
-      min-width: 720px;
-    }
-
-    #leagueFilters {
-      gap: 8px;
-    }
-
-    #leagueFilters label {
-      font-size: 12px;
-    }
-  }
-
-/* Mobile player cards */
-
-#mobilePlayerCards {
-  display: none;
+  return response.json();
 }
 
-@media (max-width: 700px) {
+// ------------------------------
+// LEAGUE CLASSIFICATION
+// ------------------------------
 
-  /* Hide the desktop table on mobile */
-  #playerTable {
-    display: none;
+function leagueType(league) {
+  const type = Number(league.settings?.type);
+
+  return ({
+    0: "Redraft",
+    1: "Keeper",
+    2: "Dynasty",
+    3: "Chopped"
+  })[type] || "Other";
+}
+
+function isEmptyLeague(rosters) {
+  return (
+    Array.isArray(rosters) &&
+    rosters.length > 0 &&
+    rosters.every(roster =>
+      Array.isArray(roster.players) &&
+      roster.players.length === 0
+    )
+  );
+}
+
+// ------------------------------
+// PLAYER DATABASE
+// ------------------------------
+
+async function getPlayerDatabase() {
+  if (playerDatabase) {
+    return playerDatabase;
   }
 
-  #mobilePlayerCards {
-    display: grid;
-    gap: 12px;
-    margin-top: 16px;
+  const database = await getData(
+    `${API}/players/nfl`
+  );
+
+  if (
+    !database ||
+    typeof database !== "object" ||
+    Array.isArray(database)
+  ) {
+    throw new Error(
+      "Invalid player directory response"
+    );
   }
 
-  .player-card {
-    background: #1b2029;
-    border: 1px solid #303642;
-    border-radius: 14px;
-    padding: 16px;
+  playerDatabase = database;
+  return database;
+}
+
+// ------------------------------
+// INJURY HELPERS
+// ------------------------------
+
+function normalizedInjury(injury) {
+  return String(injury ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function hasInjuryDesignation(player) {
+  const injury = normalizedInjury(player.injury);
+
+  return ![
+    "",
+    "—",
+    "null",
+    "healthy",
+    "active"
+  ].includes(injury);
+}
+
+function hasInjuryAlert(player) {
+  return (
+    player.starting > 0 &&
+    hasInjuryDesignation(player)
+  );
+}
+
+function injuryStatusClass(injury) {
+  const value = normalizedInjury(injury);
+
+  if (
+    ["out", "o", "ir", "injured reserve"].includes(value)
+  ) {
+    return "injury-out";
   }
 
-  .player-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    min-height: 48px;
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    text-align: left;
+  if (
+    ["questionable", "q"].includes(value)
+  ) {
+    return "injury-questionable";
   }
 
-  .player-card-header:hover {
-    background: transparent;
+  if (
+    ["doubtful", "d"].includes(value)
+  ) {
+    return "injury-doubtful";
   }
 
-  .player-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: #f5f6fa;
+  if (
+    ["", "—", "null", "healthy", "active"].includes(value)
+  ) {
+    return "injury-healthy";
   }
 
-  .player-info {
-    font-size: 12px;
-    color: #a0a7b5;
-    margin-top: 3px;
+  return "injury-other";
+}
+
+// ------------------------------
+// ROSTER STATUS HELPERS
+// ------------------------------
+
+function rosterStatusClass(status) {
+  return ({
+    Starting: "status-starting",
+    Bench: "status-bench",
+    IR: "status-ir",
+    Taxi: "status-taxi"
+  })[status] || "";
+}
+
+function sortedPlayerLeagues(player) {
+  return [...player.leagues].sort((a, b) => {
+    const orderA =
+      STATUS_ORDER[a.status] ?? 99;
+
+    const orderB =
+      STATUS_ORDER[b.status] ?? 99;
+
+    return (
+      orderA - orderB ||
+      a.name.localeCompare(b.name)
+    );
+  });
+}
+
+// ------------------------------
+// RESET DASHBOARD
+// ------------------------------
+
+function clearResults() {
+  leagueData = [];
+
+  const numberIds = [
+    "leagueCount",
+    "playerCount",
+    "uniqueCount",
+    "starterCount",
+    "benchCount",
+    "reserveCount",
+    "taxiCount",
+    "injuredStarterCount",
+    "affectedLineupCount"
+  ];
+
+  for (const id of numberIds) {
+    $(id).textContent = "--";
   }
 
-  .player-owned {
-    font-size: 20px;
-    font-weight: 650;
-    color: #f5f6fa;
-    text-align: right;
+  $("playerTableBody").replaceChildren();
+  $("mobilePlayerCards").replaceChildren();
+
+  $("playerStatus").textContent =
+    "Load leagues to see your players.";
+
+  $("emptyLeagueStatus").textContent =
+    "Load leagues to see filter results.";
+}
+
+// ------------------------------
+// LOAD USER AND LEAGUES
+// ------------------------------
+
+async function loadLeagues() {
+  const username =
+    $("sleeperUsername").value.trim();
+
+  if (!username) {
+    $("status").textContent =
+      "Please enter a Sleeper username.";
+    return;
   }
 
-  .player-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-top: 16px;
-  }
+  const currentRequest = ++requestNumber;
 
-  .player-stat-label {
-    color: #a0a7b5;
-    font-size: 11px;
-  }
+  clearResults();
+  loadedUsername = "";
 
-  .player-stat-value {
-    font-size: 16px;
-    font-weight: 600;
-    margin-top: 3px;
-  }
+  loadButton.disabled = true;
+  loadButton.textContent = "Loading...";
 
-  .player-details {
-    border-top: 1px solid #303642;
-    margin-top: 16px;
-    padding-top: 12px;
-  }
+  $("status").textContent =
+    `Looking up ${username}...`;
 
-  .player-league {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 9px 0;
-    font-size: 12px;
-  }
+  try {
+    const user = await getData(
+      `${API}/user/${encodeURIComponent(username)}`
+    );
 
-  .player-league-name {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
+    if (currentRequest !== requestNumber) return;
 
-  .player-league-status {
-    color: #a0a7b5;
-    white-space: nowrap;
-  }
+    if (!user?.user_id) {
+      throw new Error(
+        "Sleeper username not found. Check spelling."
+      );
+    }
 
-  .player-league-status.starting {
-    color: #7fc9a4;
+    const userId = String(user.user_id);
+
+    const leagues = await getData(
+      `${API}/user/${userId}/leagues/nfl/${SEASON}`
+    );
+
+    if (currentRequest !== requestNumber) return;
+
+    if (!Array.isArray(leagues)) {
+      throw new Error(
+        "Unexpected league response."
+      );
+    }
+
+    $("status").textContent =
+      `Found ${leagues.length} leagues. Loading rosters...`;
+
+    const results = await Promise.allSettled(
+      leagues.map(async league => {
+        const rosters = await getData(
+          `${API}/league/${league.league_id}/rosters`
+        );
+
+        if (!Array.isArray(rosters)) {
+          throw new Error(
+            "Invalid roster response"
+          );
+        }
+
+        const myRoster = rosters.find(roster =>
+          String(roster.owner_id) === userId ||
+          (roster.co_owners || []).some(
+            id => String(id) === userId
+          )
+        );
+
+        return {
+          league,
+          myRoster,
+          empty: isEmptyLeague(rosters)
+        };
+      })
+    );
+
+    if (currentRequest !== requestNumber) return;
+
+    leagueData = results.map((result, index) =>
+      result.status === "fulfilled"
+        ? result.value
+        : {
+            league: leagues[index],
+            failed: true
+          }
+    );
+
+    loadedUsername = username;
+
+    const failures = leagueData.filter(
+      item => item.failed
+    ).length;
+
+    $("status").textContent =
+      `Loaded ${leagues.length - failures} of ` +
+      `${leagues.length} leagues for ${username}. ` +
+      `${failures} roster requests failed.`;
+
+    renderDashboard();
+
+    const hasPlayers = leagueData.some(item =>
+      item.myRoster &&
+      Array.isArray(item.myRoster.players) &&
+      item.myRoster.players.length > 0
+    );
+
+    if (hasPlayers) {
+      $("playerStatus").textContent =
+        "Loading player names and injuries...";
+
+      try {
+        await getPlayerDatabase();
+
+        if (currentRequest !== requestNumber) return;
+
+        renderDashboard();
+      } catch (error) {
+        if (currentRequest !== requestNumber) return;
+
+        console.error(
+          "Player directory error:",
+          error
+        );
+
+        renderDashboard();
+
+        $("playerStatus").textContent =
+          `Player directory unavailable: ` +
+          `${error.message}. Showing player IDs. ` +
+          `Injury alerts cannot be calculated.`;
+      }
+    }
+  } catch (error) {
+    if (currentRequest !== requestNumber) return;
+
+    clearResults();
+
+    $("status").textContent =
+      `Error: ${error.message}`;
+
+    console.error(error);
+  } finally {
+    if (currentRequest === requestNumber) {
+      loadButton.disabled = false;
+      loadButton.textContent = "Load My Leagues";
+    }
   }
 }
 
+// ------------------------------
+// FILTER SELECTED LEAGUES
+// ------------------------------
 
-</style>
+function selectedLeagues() {
+  const selectedTypes = new Set(
+    [
+      ...document.querySelectorAll(
+        "#baseFilters input:checked"
+      )
+    ].map(input => input.value)
+  );
 
-</head>
+  const excludeEmpty =
+    $("excludeEmptyLeagues").checked;
 
-<body>
-  <h1>Sleeper Command Center</h1>
-  <p>Your fantasy football portfolio</p>
+  const bestBallOnly =
+    $("bestBallOnly").checked;
 
-  <button id="loadButton">Load My Leagues</button>
+  return leagueData.filter(item =>
+    !item.failed &&
+    (!excludeEmpty || !item.empty) &&
+    selectedTypes.has(
+      leagueType(item.league)
+    ) &&
+    (
+      !bestBallOnly ||
+      Number(
+        item.league.settings?.best_ball
+      ) === 1
+    )
+  );
+}
 
-  <div class="stats">
-    <div class="stat">
-      <div class="number" id="leagueCount">--</div>
-      <div class="label">Leagues</div>
-    </div>
+// ------------------------------
+// BUILD PLAYER EXPOSURE
+// ------------------------------
 
-    <div class="stat">
-      <div class="number" id="playerCount">--</div>
-      <div class="label">Roster Spots</div>
-    </div>
+function renderDashboard() {
+  if (!loadedUsername) return;
 
-    <div class="stat">
-      <div class="number" id="starterCount">--</div>
-      <div class="label">Starters</div>
-    </div>
+  const included = selectedLeagues();
 
-    <div class="stat">
-      <div class="number" id="benchCount">--</div>
-      <div class="label">Bench</div>
-    </div>
-  </div>
+  const emptyCount = leagueData.filter(
+    item => !item.failed && item.empty
+  ).length;
 
-  <p id="status">Ready to connect to Sleeper.</p>
+  const failures = leagueData.filter(
+    item => item.failed
+  ).length;
 
-<h2>Player Exposure</h2>
+  const missingRosters = included.filter(
+    item => !item.myRoster
+  ).length;
 
-<input
-  id="playerSearch"
-  type="text"
-  placeholder="Search for a player..."
-  style="width: 95%; padding: 10px; margin-top: 10px;"
->
+  const exposure = new Map();
 
-<p id="playerStatus">
-  Load your leagues to see your players.
-</p>
+  const totals = {
+    player: 0,
+    start: 0,
+    bench: 0,
+    reserve: 0,
+    taxi: 0
+  };
 
-<div style="overflow-x: auto;">
-  <table
-    id="playerTable"
-    style="width: 100%; text-align: left; border-collapse: collapse;"
-  >
+  for (const { league, myRoster } of included) {
+    if (!myRoster) continue;
 
-<thead>
-  <tr>
-    <th>Player</th>
-    <th>Position</th>
-    <th>Owned</th>
-    <th>Start</th>
-    <th>Bench</th>
-    <th>IR</th>
-    <th>Taxi</th>
-    <th>Injury</th>
-  </tr>
-</thead>
+    const starters = new Set(
+      (myRoster.starters || [])
+        .filter(id => id && id !== "0")
+        .map(String)
+    );
 
+    const reserve = new Set(
+      (myRoster.reserve || []).map(String)
+    );
 
-    <tbody id="playerTableBody"></tbody>
-  </table>
-</div>
+    const taxi = new Set(
+      (myRoster.taxi || []).map(String)
+    );
 
+    for (const rawId of myRoster.players || []) {
+      const id = String(rawId);
 
-<!-- Mobile player cards -->
-<div id="mobilePlayerCards"></div>
+      if (!id || id === "0") continue;
 
+      const status = starters.has(id)
+        ? "Starting"
+        : reserve.has(id)
+        ? "IR"
+        : taxi.has(id)
+        ? "Taxi"
+        : "Bench";
 
-  <script src="app.js"></script>
-</body>
-</html>
+      if (!exposure.has(id)) {
+        exposure.set(id, {
+          id,
+          owned: 0,
+          starting: 0,
+          bench: 0,
+          reserve: 0,
+          taxi: 0,
+          leagues: []
+        });
+      }
+
+      const player = exposure.get(id);
+      player.owned++;
+
+      const playerKey = ({
+        Starting: "starting",
+        Bench: "bench",
+        IR: "reserve",
+        Taxi: "taxi"
+      })[status];
+
+      player[playerKey]++;
+
+      player.leagues.push({
+        name: league.name || "Unnamed league",
+        status
+      });
+
+      totals.player++;
+
+      const totalKey = ({
+        Starting: "start",
+        Bench: "bench",
+        IR: "reserve",
+        Taxi: "taxi"
+      })[status];
+
+      totals[totalKey]++;
+    }
+  }
+
+  // Update portfolio totals.
+  const numbers = {
+    leagueCount: included.length,
+    playerCount: totals.player,
+    uniqueCount: exposure.size,
+    starterCount: totals.start,
+    benchCount: totals.bench,
+    reserveCount: totals.reserve,
+    taxiCount: totals.taxi
+  };
+
+  for (const [id, value] of Object.entries(numbers)) {
+    $(id).textContent = value;
+  }
+
+  $("emptyLeagueStatus").textContent =
+    `${emptyCount} empty league(s) detected. ` +
+    `Empty-league exclusion is ` +
+    `${$("excludeEmptyLeagues").checked ? "on" : "off"}. ` +
+    `${failures} failed request(s). ` +
+    `${missingRosters} selected league(s) ` +
+    `without your roster.`;
+
+  // Match player IDs to names and injuries.
+  const players = [...exposure.values()]
+    .map(player => {
+      const info =
+        playerDatabase?.[player.id] || {};
+
+      return {
+        ...player,
+        name:
+          info.full_name ||
+          [info.first_name, info.last_name]
+            .filter(Boolean)
+            .join(" ") ||
+          `Player ID ${player.id}`,
+        position: info.position || "—",
+        team: info.team || "—",
+        injury: info.injury_status || "—"
+      };
+    })
+    .sort((a, b) =>
+      b.owned - a.owned ||
+      a.name.localeCompare(b.name)
+    );
+
+  // Calculate injured starters.
+  if (playerDatabase) {
+    const injuredStarters =
+      players.filter(hasInjuryAlert);
+
+    const affectedLineups =
+      injuredStarters.reduce(
+        (sum, player) =>
+          sum + player.starting,
+        0
+      );
+
+    $("injuredStarterCount").textContent =
+      injuredStarters.length;
+
+    $("affectedLineupCount").textContent =
+      affectedLineups;
+  } else {
+    $("injuredStarterCount").textContent = "--";
+    $("affectedLineupCount").textContent = "--";
+  }
+
+  // Search and health filters.
+  const query = $("playerSearch").value
+    .trim()
+    .toLowerCase();
+
+  const includeHealthy =
+    $("includeHealthy").checked;
+
+  const alertsOnly =
+    $("injuryAlertsOnly").checked;
+
+  const filtered = players.filter(player => {
+    const matchesSearch =
+      `${player.name} ${player.position} ${player.team}`
+        .toLowerCase()
+        .includes(query);
+
+    const matchesInjury =
+      includeHealthy ||
+      hasInjuryDesignation(player);
+
+    const matchesAlert =
+      !alertsOnly ||
+      (
+        playerDatabase &&
+        hasInjuryAlert(player)
+      );
+
+    return (
+      matchesSearch &&
+      matchesInjury &&
+      matchesAlert
+    );
+  });
+
+  if (playerDatabase) {
+    $("playerStatus").textContent =
+      `Showing ${filtered.length} of ` +
+      `${players.length} unique players ` +
+      `across ${included.length} selected leagues.`;
+  } else {
+    $("playerStatus").textContent =
+      `Player directory unavailable or loading. ` +
+      `Injury filters require player data.`;
+  }
+
+  renderPlayers(filtered);
+}
+
+// ------------------------------
+// SAFE TEXT DISPLAY
+// ------------------------------
+
+function appendText(parent, tag, text, className) {
+  const node = document.createElement(tag);
+
+  node.textContent = String(text);
+
+  if (className) {
+    node.className = className;
+  }
+
+  parent.appendChild(node);
+  return node;
+}
+
+// ------------------------------
+// EXPANDED LEAGUE BREAKDOWN
+// ------------------------------
+
+function leagueDetails(parent, player) {
+  const list = document.createElement("div");
+  list.className = "league-list";
+
+  for (
+    const league of sortedPlayerLeagues(player)
+  ) {
+    const item = document.createElement("div");
+    item.className = "league-item";
+
+    appendText(
+      item,
+      "span",
+      league.name
+    );
+
+    appendText(
+      item,
+      "span",
+      league.status,
+      rosterStatusClass(league.status)
+    );
+
+    list.appendChild(item);
+  }
+
+  parent.appendChild(list);
+}
+
+// ------------------------------
+// DESKTOP TABLE + MOBILE CARDS
+// ------------------------------
+
+function renderPlayers(players) {
+  const tbody = $("playerTableBody");
+  const cards = $("mobilePlayerCards");
+
+  tbody.replaceChildren();
+  cards.replaceChildren();
+
+  for (const player of players) {
+    // Desktop player row.
+    const row = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "player-button";
+    toggle.textContent = `▸ ${player.name}`;
+    toggle.setAttribute("aria-expanded", "false");
+
+    nameCell.appendChild(toggle);
+    row.appendChild(nameCell);
+
+    const values = [
+      `${player.position} · ${player.team}`,
+      player.owned,
+      player.starting,
+      player.bench,
+      player.reserve,
+      player.taxi,
+      player.injury
+    ];
+
+    values.forEach((value, index) => {
+      const cell = appendText(row, "td", value);
+
+      if (index === 6) {
+        cell.className =
+          injuryStatusClass(player.injury);
+      }
+    });
+
+    tbody.appendChild(row);
+
+    // Hidden desktop league breakdown.
+    const detailRow = document.createElement("tr");
+    detailRow.className = "detail-row";
+    detailRow.hidden = true;
+
+    const detailCell = document.createElement("td");
+    detailCell.colSpan = 8;
+    detailCell.className = "detail-cell";
+
+    leagueDetails(detailCell, player);
+
+    detailRow.appendChild(detailCell);
+    tbody.appendChild(detailRow);
+
+    toggle.addEventListener("click", () => {
+      detailRow.hidden = !detailRow.hidden;
+
+      toggle.textContent =
+        `${detailRow.hidden ? "▸" : "▾"} ${player.name}`;
+
+      toggle.setAttribute(
+        "aria-expanded",
+        String(!detailRow.hidden)
+      );
+    });
+
+    // Mobile player card.
+    const card = document.createElement("article");
+    card.className = "player-card";
+
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "card-header";
+    header.setAttribute("aria-expanded", "false");
+
+    const left = document.createElement("div");
+
+    appendText(
+      left,
+      "div",
+      player.name,
+      "card-title"
+    );
+
+    appendText(
+      left,
+      "div",
+      `${player.position} · ${player.team}`,
+      "card-sub"
+    );
+
+    const injuryLabel = appendText(
+      left,
+      "div",
+      player.injury === "—"
+        ? "No injury designation"
+        : player.injury,
+      "card-sub"
+    );
+
+    injuryLabel.classList.add(
+      injuryStatusClass(player.injury)
+    );
+
+    const right = document.createElement("div");
+
+    appendText(
+      right,
+      "div",
+      player.owned,
+      "card-owned"
+    );
+
+    appendText(
+      right,
+      "div",
+      "Owned · tap to expand",
+      "card-sub"
+    );
+
+    header.append(left, right);
+    card.appendChild(header);
+
+    // Mobile roster counts.
+    const stats = document.createElement("div");
+    stats.className = "card-stats";
+
+    for (const [label, value, status] of [
+      ["Start", player.starting, "Starting"],
+      ["Bench", player.bench, "Bench"],
+      ["IR", player.reserve, "IR"],
+      ["Taxi", player.taxi, "Taxi"]
+    ]) {
+      const stat = document.createElement("div");
+
+      appendText(
+        stat,
+        "div",
+        label,
+        "card-stat-label"
+      );
+
+      const statValue = appendText(
+        stat,
+        "div",
+        value,
+        "card-stat-value"
+      );
+
+      statValue.classList.add(
+        rosterStatusClass(status)
+      );
+
+      stats.appendChild(stat);
+    }
+
+    card.appendChild(stats);
+
+    // Mobile expanded leagues.
+    const details = document.createElement("div");
+    details.className = "card-details";
+    details.hidden = true;
+
+    leagueDetails(details, player);
+    card.appendChild(details);
+
+    header.addEventListener("click", () => {
+      details.hidden = !details.hidden;
+
+      header.setAttribute(
+        "aria-expanded",
+        String(!details.hidden)
+      );
+    });
+
+    cards.appendChild(card);
+  }
+}
+
+// ------------------------------
+// EVENT LISTENERS
+// ------------------------------
+
+// Load account.
+loadButton.addEventListener(
+  "click",
+  loadLeagues
+);
+
+// Reset old results when changing users.
+$("sleeperUsername").addEventListener(
+  "input",
+  () => {
+    if (
+      loadedUsername &&
+      $("sleeperUsername").value.trim() !==
+        loadedUsername
+    ) {
+      ++requestNumber;
+      loadedUsername = "";
+
+      clearResults();
+
+      loadButton.disabled = false;
+      loadButton.textContent = "Load My Leagues";
+
+      $("status").textContent =
+        "Username changed. Click Load My Leagues " +
+        "to load this account.";
+    }
+  }
+);
+
+// League filters.
+for (const input of document.querySelectorAll(
+  "#baseFilters input, #bestBallOnly, #excludeEmptyLeagues"
+)) {
+  input.addEventListener(
+    "change",
+    renderDashboard
+  );
+}
+
+// Player search.
+$("playerSearch").addEventListener(
+  "input",
+  renderDashboard
+);
+
+// Include healthy players.
+$("includeHealthy").addEventListener(
+  "change",
+  renderDashboard
+);
+
+// Injury alerts only.
+$("injuryAlertsOnly").addEventListener(
+  "change",
+  renderDashboard
+);
