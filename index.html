@@ -3,9 +3,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101319">
-<title>Sleeper Command Center v7.2</title>
+<title>Sleeper Command Center v7.4</title>
 <style>
 :root {
   color-scheme:dark;
@@ -143,8 +143,6 @@ select:focus-visible,summary:focus-visible {
   background:#383453;
   color:white;
 }
-
-/* Compact portfolio summary */
 .portfolio-row {
   display:flex;
   justify-content:space-between;
@@ -156,8 +154,6 @@ select:focus-visible,summary:focus-visible {
   font-weight:600;
   font-variant-numeric:tabular-nums;
 }
-
-/* Existing alert colors */
 .red {color:var(--red)!important}
 .orange {color:var(--orange)!important}
 .yellow {color:var(--yellow)!important}
@@ -195,6 +191,7 @@ select:focus-visible,summary:focus-visible {
   padding:2px 6px;
   font-size:11px;
   font-weight:650;
+  white-space:nowrap;
 }
 .tags {
   display:flex;
@@ -210,10 +207,8 @@ select:focus-visible,summary:focus-visible {
 summary {cursor:pointer}
 .neutral-details summary {color:var(--muted)}
 
-/* New outer collapsible section headers */
-.dashboard-section {
-  margin:20px 0;
-}
+/* Collapsible outer sections */
+.dashboard-section {margin:20px 0}
 .section-toggle {
   display:flex;
   justify-content:space-between;
@@ -226,17 +221,8 @@ summary {cursor:pointer}
   cursor:pointer;
   list-style:none;
 }
-.section-toggle::-webkit-details-marker {
-  display:none;
-}
-.section-toggle:focus-visible {
-  outline:2px solid var(--accent);
-  outline-offset:2px;
-}
-.section-title {
-  font-size:18px;
-  font-weight:700;
-}
+.section-toggle::-webkit-details-marker {display:none}
+.section-title {font-size:18px;font-weight:700}
 .section-description {
   display:block;
   color:var(--muted);
@@ -253,11 +239,8 @@ summary {cursor:pointer}
 }
 .section-content {padding-top:13px}
 
-/* Original league suggestion tiles */
-#suggestionsList {
-  display:grid;
-  gap:12px;
-}
+/* Existing league tiles */
+#suggestionsList {display:grid;gap:12px}
 .league-card {
   background:var(--panel);
   border:1px solid var(--border);
@@ -268,13 +251,7 @@ summary {cursor:pointer}
   list-style:none;
   padding:16px;
 }
-.league-card>summary::-webkit-details-marker {
-  display:none;
-}
-.league-card>summary:focus-visible {
-  outline:2px solid var(--accent);
-  outline-offset:-2px;
-}
+.league-card>summary::-webkit-details-marker {display:none}
 .league-title {
   font-size:17px;
   font-weight:700;
@@ -306,14 +283,8 @@ summary {cursor:pointer}
   padding-right:6px;
 }
 .metric:last-child {border:0}
-.metric strong {
-  display:block;
-  font-size:13px;
-}
-.metric span {
-  font-size:11px;
-  color:var(--muted);
-}
+.metric strong {display:block;font-size:13px}
+.metric span {font-size:11px;color:var(--muted)}
 .suggestion-totals {
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
@@ -344,18 +315,13 @@ summary {cursor:pointer}
   gap:8px;
 }
 .suggestion-name {font-weight:650}
-.suggestion-meta {
-  color:var(--muted);
-  font-size:12px;
-  margin-top:4px;
-}
-.suggestion-note {
+.suggestion-meta,.suggestion-note {
   color:var(--muted);
   font-size:12px;
   margin-top:4px;
 }
 
-/* Existing player exposure design */
+/* Player exposure */
 .toolbar {
   display:flex;
   justify-content:space-between;
@@ -390,40 +356,23 @@ th {color:var(--muted)}
 }
 .player-button:hover {background:none}
 .detail-row td {background:#202632}
-.league-list {
-  display:grid;
-  gap:10px;
-  padding:8px 0;
-}
+.league-list {display:grid;gap:10px;padding:8px 0}
 .league-item {
   display:grid;
   grid-template-columns:minmax(0,1fr) 90px 52px;
   gap:8px;
   align-items:center;
 }
-.league-item span:first-child {
-  overflow-wrap:anywhere;
-}
-.league-points {
-  text-align:right;
-  font-weight:650;
-}
+.league-item span:first-child {overflow-wrap:anywhere}
+.league-points {text-align:right;font-weight:650}
 .status-starting {color:var(--green)}
 .status-bench,.status-not-starting {color:var(--blue)}
 .status-ir {color:var(--red)}
 .status-taxi {color:var(--purple)}
-.injury-out,.injury-doubtful {
-  color:var(--red)!important;
-}
-.injury-questionable {
-  color:var(--orange)!important;
-}
-.injury-healthy {
-  color:var(--muted)!important;
-}
-.injury-other {
-  color:var(--yellow)!important;
-}
+.injury-out,.injury-doubtful {color:var(--red)!important}
+.injury-questionable {color:var(--orange)!important}
+.injury-healthy {color:var(--muted)!important}
+.injury-other {color:var(--yellow)!important}
 #mobilePlayerCards {display:none}
 .player-card {
   background:var(--panel);
@@ -450,32 +399,17 @@ th {color:var(--muted)}
   margin-left:auto;
   text-align:right;
 }
-.card-title {
-  font-size:16px;
-  font-weight:700;
-}
-.card-owned {
-  font-size:25px;
-  font-weight:700;
-}
-.card-sub {
-  font-size:12px;
-  color:var(--muted);
-}
+.card-title {font-size:16px;font-weight:700}
+.card-owned {font-size:25px;font-weight:700}
+.card-sub {font-size:12px;color:var(--muted)}
 .card-stats {
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
   gap:8px;
   margin:15px 0;
 }
-.card-stat-label {
-  font-size:11px;
-  color:var(--muted);
-}
-.card-stat-value {
-  font-size:17px;
-  font-weight:650;
-}
+.card-stat-label {font-size:11px;color:var(--muted)}
+.card-stat-value {font-size:17px;font-weight:650}
 .score-summary {
   display:flex;
   justify-content:space-between;
@@ -497,15 +431,9 @@ th {color:var(--muted)}
   body {padding:15px 12px}
   .panel {padding:14px}
   .account {display:block}
-  .account button {
-    width:100%;
-    margin-top:10px;
-  }
+  .account button {width:100%;margin-top:10px}
   .table-wrap {display:none}
-  #mobilePlayerCards {
-    display:grid;
-    gap:11px;
-  }
+  #mobilePlayerCards {display:grid;gap:11px}
   .search {width:100%!important}
   .league-card>summary {padding:13px}
   .suggestion-body {padding:8px 13px 13px}
@@ -536,8 +464,11 @@ th {color:var(--muted)}
   <div class="account">
     <div class="field">
       <label for="sleeperUsername">Sleeper username</label>
-      <input id="sleeperUsername" type="text"
-        value="nytman" autocomplete="off">
+      
+<input id="sleeperUsername" type="text"
+  placeholder="Enter Sleeper username"
+  autocomplete="off">
+
     </div>
     <button id="loadButton" type="button">
       Load My Leagues
@@ -701,9 +632,10 @@ th {color:var(--muted)}
   <p id="scoreUpdated" class="status"></p>
 </section>
 
-<!-- Collapsible Lineup Suggestions -->
+
 <details id="suggestionsSection"
-  class="dashboard-section" open>
+  class="dashboard-section">
+
   <summary class="section-toggle">
     <div>
       <span class="section-title">
@@ -735,7 +667,6 @@ th {color:var(--muted)}
   </div>
 </details>
 
-<!-- Collapsible Player Exposure -->
 <details id="exposureSection"
   class="dashboard-section">
   <summary class="section-toggle">
