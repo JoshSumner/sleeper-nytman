@@ -2,6 +2,31 @@
 <!doctype html>
 <html lang="en">
 <head>
+
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BEZ32FE396"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+
+  function gtag() {
+    dataLayer.push(arguments);
+  }
+
+  // Default to no analytics storage until consent.
+  gtag("consent", "default", {
+    analytics_storage: "denied",
+    ad_storage: "denied",
+    ad_user_data: "denied",
+    ad_personalization: "denied"
+  });
+
+  gtag("js", new Date());
+
+  gtag("config", "G-BEZ32FE396", {
+    send_page_view: false
+  });
+</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#101319">
@@ -584,6 +609,74 @@ th {color:var(--muted);font-size:11px}
 </div>
 
 <div id="mobilePlayerCards"></div>
+
+<!-- Analytics preferences -->
+<div id="analyticsNotice" class="panel" hidden>
+  <p>
+    Sleeper Command Center uses optional analytics
+    to understand visits and feature usage.
+    We don't send Sleeper usernames or roster
+    information to Google Analytics.
+  </p>
+
+  <button id="acceptAnalytics" type="button">
+    Allow Analytics
+  </button>
+
+  <button id="declineAnalytics" type="button">
+    No Thanks
+  </button>
+</div>
+
+<script>
+(function () {
+  const notice = document.getElementById(
+    "analyticsNotice"
+  );
+
+  const key = "sleeper_analytics_consent";
+
+  function applyChoice(allowed) {
+    gtag("consent", "update", {
+      analytics_storage: allowed
+        ? "granted"
+        : "denied"
+    });
+
+    if (allowed) {
+      gtag("event", "page_view", {
+        page_title: document.title,
+        page_location: location.origin + location.pathname
+      });
+    }
+  }
+
+  const saved = localStorage.getItem(key);
+
+  if (saved === "yes" || saved === "no") {
+    applyChoice(saved === "yes");
+  } else {
+    notice.hidden = false;
+  }
+
+  document.getElementById(
+    "acceptAnalytics"
+  ).addEventListener("click", () => {
+    localStorage.setItem(key, "yes");
+    applyChoice(true);
+    notice.hidden = true;
+  });
+
+  document.getElementById(
+    "declineAnalytics"
+  ).addEventListener("click", () => {
+    localStorage.setItem(key, "no");
+    notice.hidden = true;
+  });
+})();
+</script>
+
+
 <script src="app.js"></script>
 </body>
 </html>
