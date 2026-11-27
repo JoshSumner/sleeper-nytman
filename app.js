@@ -42,11 +42,20 @@ const NFL_TEAMS = new Set([
 
 function normalizeTeam(team) {
   const value = String(team || "").toUpperCase();
+
   return ({
-    WSH:"WAS", JAC:"JAX", LA:"LAR",
-    OAK:"LV", SD:"LAC", STL:"LAR"
+    WSH:"WAS",
+    JAC:"JAX",
+    LA:"LAR",
+    OAK:"LV",
+    SD:"LAC",
+    STL:"LAR"
   })[value] || value;
 }
+
+// ----------------------------
+// API
+// ----------------------------
 
 async function getData(url) {
   const response = await fetch(url, {
@@ -111,7 +120,9 @@ function selectedLeagues() {
 // ----------------------------
 
 function normalizedInjury(injury) {
-  return String(injury ?? "").trim().toLowerCase();
+  return String(injury ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function injuryClass(injury) {
@@ -154,10 +165,6 @@ function injuryPriority(injury) {
   }
 
   return "none";
-}
-
-function hasInjuryDesignation(player) {
-  return injuryClass(player.injury) !== "injury-healthy";
 }
 
 function statusClass(status) {
@@ -285,6 +292,7 @@ function alertForPlayer(player) {
   }
 
   const bye = isConfirmedBye(player.team);
+
   const injury = playerDatabase
     ? injuryPriority(player.injury)
     : "none";
@@ -319,16 +327,15 @@ function alertForPlayer(player) {
 
   const game = gameInfo(player.team);
 
-  // A confirmed bye has no player kickoff time.
-  // Without league-specific lock rules, do not
-  // claim the lineup is editable.
+  // Bye players have no kickoff time.
+  // Their lineup lock status is not verified.
   if (bye) {
     result.category = "unverified";
     return result;
   }
 
-  // Missing or incomplete schedule information
-  // must not become an actionable red warning.
+  // Missing schedule data cannot establish
+  // that a lineup change is possible.
   if (!game.date || game.state === "Unknown") {
     result.category = "unverified";
     return result;
@@ -341,9 +348,8 @@ function alertForPlayer(player) {
     return result;
   }
 
-  // Use both the reported game status and kickoff.
-  // If the API says Scheduled but kickoff passed,
-  // treat the player as potentially locked.
+  // A game that has started or finished is
+  // no longer highlighted as actionable.
   if (
     game.state === "Live" ||
     game.state === "Final" ||
@@ -353,12 +359,13 @@ function alertForPlayer(player) {
     return result;
   }
 
+  // Upcoming warnings are potentially actionable,
+  // but actual Sleeper lineup locks may vary.
   if (game.state === "Scheduled") {
-    // Current Roster is the actionable workflow.
-    // Selected Week may represent a historical lineup.
     result.category = rosterMode === "current"
       ? "upcoming"
       : "unverified";
+
     return result;
   }
 
@@ -371,12 +378,17 @@ function alertForPlayer(player) {
 // ----------------------------
 
 async function getPlayerDatabase() {
-  if (playerDatabase) return playerDatabase;
+  if (playerDatabase) {
+    return playerDatabase;
+  }
 
   const data = await getData(`${API}/players/nfl`);
 
-  if (!data || typeof data !== "object" ||
-      Array.isArray(data)) {
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
     throw new Error("Invalid player directory");
   }
 
@@ -394,10 +406,16 @@ function clearResults() {
   scoreWeek = null;
 
   for (const id of [
-    "leagueCount","playerCount","uniqueCount",
-    "starterCount","benchCount","reserveCount",
-    "taxiCount","highPriorityCount",
-    "highPriorityPlayers","questionableCount",
+    "leagueCount",
+    "playerCount",
+    "uniqueCount",
+    "starterCount",
+    "benchCount",
+    "reserveCount",
+    "taxiCount",
+    "highPriorityCount",
+    "highPriorityPlayers",
+    "questionableCount",
     "questionablePlayers"
   ]) {
     $(id).textContent = "--";
@@ -440,8 +458,13 @@ function setRosterMode(mode) {
 
   const current = mode === "current";
 
-  $("modeCurrent").classList.toggle("active", current);
-  $("modeWeekly").classList.toggle("active", !current);
+  $("modeCurrent").classList.toggle(
+    "active", current
+  );
+
+  $("modeWeekly").classList.toggle(
+    "active", !current
+  );
 
   $("modeCurrent").setAttribute(
     "aria-pressed", String(current)
@@ -473,8 +496,10 @@ function setRosterMode(mode) {
 
 for (let week = 1; week <= 18; week++) {
   const option = document.createElement("option");
+
   option.value = String(week);
   option.textContent = `Week ${week}`;
+
   $("gameWeek").appendChild(option);
 }
 
@@ -504,10 +529,14 @@ async function loadSchedule() {
       `&seasontype=2&week=${week}&limit=100`
     );
 
-    if (request !== scheduleVersion) return;
+    if (request !== scheduleVersion) {
+      return;
+    }
 
-    if (!Array.isArray(data.events) ||
-        data.events.length === 0) {
+    if (
+      !Array.isArray(data.events) ||
+      data.events.length === 0
+    ) {
       throw new Error("No games returned");
     }
 
@@ -601,8 +630,8 @@ async function loadSchedule() {
     scheduleByTeam = games;
     scheduleReady = true;
 
-    // Heuristic only, not official bye confirmation.
-    // Unknown byes are never treated as actionable.
+    // Conservative schedule heuristic.
+    // This does not independently confirm byes.
     byeValidated =
       !duplicateTeam &&
       !invalidGame &&
@@ -627,7 +656,9 @@ async function loadSchedule() {
       "Times use your device timezone.";
 
   } catch (error) {
-    if (request !== scheduleVersion) return;
+    if (request !== scheduleVersion) {
+      return;
+    }
 
     scheduleReady = false;
     byeValidated = false;
@@ -658,7 +689,9 @@ function scoreForPlayer(leagueId, playerId) {
   const matchup = weeklyMatchup(leagueId);
   const scores = matchup?.players_points;
 
-  if (!scores) return null;
+  if (!scores) {
+    return null;
+  }
 
   const id = String(playerId);
 
@@ -696,7 +729,9 @@ function averagePoints(player) {
     )
     .filter(value => value !== null);
 
-  if (!values.length) return null;
+  if (!values.length) {
+    return null;
+  }
 
   return values.reduce((a,b) => a+b,0) /
     values.length;
@@ -845,7 +880,9 @@ async function loadLeagues() {
       `${API}/user/${encodeURIComponent(username)}`
     );
 
-    if (request !== accountVersion) return;
+    if (request !== accountVersion) {
+      return;
+    }
 
     if (!user?.user_id) {
       throw new Error("Sleeper username not found");
@@ -857,7 +894,9 @@ async function loadLeagues() {
       `${API}/user/${userId}/leagues/nfl/${SEASON}`
     );
 
-    if (request !== accountVersion) return;
+    if (request !== accountVersion) {
+      return;
+    }
 
     if (!Array.isArray(leagues)) {
       throw new Error("Invalid league response");
@@ -891,7 +930,9 @@ async function loadLeagues() {
       })
     );
 
-    if (request !== accountVersion) return;
+    if (request !== accountVersion) {
+      return;
+    }
 
     leagueData = results.map((result,index) =>
       result.status === "fulfilled"
@@ -927,11 +968,15 @@ async function loadLeagues() {
       try {
         await getPlayerDatabase();
 
-        if (request !== accountVersion) return;
+        if (request !== accountVersion) {
+          return;
+        }
 
         renderDashboard();
       } catch (error) {
-        if (request !== accountVersion) return;
+        if (request !== accountVersion) {
+          return;
+        }
 
         console.warn("Player directory:", error);
         renderDashboard();
@@ -943,7 +988,9 @@ async function loadLeagues() {
     }
 
   } catch (error) {
-    if (request !== accountVersion) return;
+    if (request !== accountVersion) {
+      return;
+    }
 
     clearResults();
 
@@ -963,7 +1010,9 @@ async function loadLeagues() {
 // ----------------------------
 
 function renderDashboard() {
-  if (!loadedUsername) return;
+  if (!loadedUsername) {
+    return;
+  }
 
   const included = selectedLeagues();
   const exposure = new Map();
@@ -1036,7 +1085,9 @@ function renderDashboard() {
     includedWithData++;
 
     for (const id of new Set(players)) {
-      if (!id || id === "0") continue;
+      if (!id || id === "0") {
+        continue;
+      }
 
       let status;
 
@@ -1154,7 +1205,7 @@ function renderDashboard() {
       a.name.localeCompare(b.name)
     );
 
-  // Divide warnings by game state.
+  // Classify lineup warnings by game state.
   const upcomingHigh = [];
   const upcomingQuestionable = [];
   const locked = [];
@@ -1163,7 +1214,9 @@ function renderDashboard() {
   for (const player of players) {
     const alert = alertForPlayer(player);
 
-    if (alert.priority === "none") continue;
+    if (alert.priority === "none") {
+      continue;
+    }
 
     if (alert.category === "locked") {
       locked.push(player);
@@ -1236,21 +1289,37 @@ function renderDashboard() {
       : "Current starters with current injuries. ") +
     "Upcoming does not guarantee lineup editability.";
 
-  const query = $("playerSearch").value
-    .trim().toLowerCase();
+  // ----------------------------
+  // PLAYER EXPOSURE FILTERS
+  // ----------------------------
 
-  const alertsOnly = $("lineupAlertsOnly").checked;
+  const query = $("playerSearch").value
+    .trim()
+    .toLowerCase();
+
+  const alertsOnly =
+    $("lineupAlertsOnly").checked;
+
+  const startersOnly =
+    $("startersOnly").checked;
 
   const filtered = players.filter(player => {
     const matchesSearch =
       `${player.name} ${player.position} ${player.team}`
-        .toLowerCase().includes(query);
+        .toLowerCase()
+        .includes(query);
+
+    const matchesAlerts =
+      !alertsOnly ||
+      alertForPlayer(player).priority !== "none";
+
+    const matchesStarters =
+      !startersOnly ||
+      player.starting > 0;
 
     return matchesSearch &&
-  (
-    !alertsOnly ||
-    alertForPlayer(player).priority !== "none"
-  );
+      matchesAlerts &&
+      matchesStarters;
   });
 
   $("playerStatus").textContent =
@@ -1270,9 +1339,12 @@ function renderDashboard() {
 
 function appendText(parent,tag,text,className) {
   const node = document.createElement(tag);
+
   node.textContent = String(text);
 
-  if (className) node.className = className;
+  if (className) {
+    node.className = className;
+  }
 
   parent.appendChild(node);
   return node;
@@ -1281,17 +1353,17 @@ function appendText(parent,tag,text,className) {
 function addAlertTags(parent,player) {
   const alert = alertForPlayer(player);
 
-  if (alert.priority === "none") return;
+  if (alert.priority === "none") {
+    return;
+  }
 
   const line = document.createElement("div");
   line.className = "alert-line";
 
   for (const reason of alert.reasons) {
-    const isQuestionable = reason === "QUESTIONABLE";
-
     const color = alert.category === "locked"
       ? "muted"
-      : isQuestionable
+      : reason === "QUESTIONABLE"
       ? "alert-orange"
       : "alert-red";
 
@@ -1314,8 +1386,9 @@ function renderAlertList(container,players,emptyText) {
   if (!players.length) {
     appendText(
       container,"div",
-      playerDatabase ? emptyText :
-        "Player injury data unavailable.",
+      playerDatabase
+        ? emptyText
+        : "Player injury data unavailable.",
       "priority-empty"
     );
     return;
@@ -1354,11 +1427,12 @@ function renderAlertList(container,players,emptyText) {
     appendText(
       meta,"span",
       `${player.starting} starting ` +
-      `${player.starting === 1 ? "lineup" : "lineups"}`
+      `${player.starting === 1
+        ? "lineup"
+        : "lineups"}`
     );
 
     const game = gameInfo(player.team);
-
     let time = shortGameTime(player.team);
 
     if (alert.category === "locked") {
@@ -1425,7 +1499,7 @@ function renderPlayers(players) {
     const avg = averagePoints(player);
     const alert = alertForPlayer(player);
 
-    // Desktop
+    // Desktop player row.
     const row = document.createElement("tr");
     const nameCell = document.createElement("td");
 
@@ -1433,7 +1507,10 @@ function renderPlayers(players) {
     toggle.type = "button";
     toggle.className = "player-button";
     toggle.textContent = `▸ ${player.name}`;
-    toggle.setAttribute("aria-expanded","false");
+
+    toggle.setAttribute(
+      "aria-expanded","false"
+    );
 
     nameCell.appendChild(toggle);
     addAlertTags(nameCell,player);
@@ -1492,18 +1569,23 @@ function renderPlayers(players) {
       );
     });
 
-    // Mobile
+    // Mobile player card.
     const card = document.createElement("article");
     card.className = "player-card";
 
     const header = document.createElement("button");
     header.type = "button";
     header.className = "card-header";
-    header.setAttribute("aria-expanded","false");
+
+    header.setAttribute(
+      "aria-expanded","false"
+    );
 
     const left = document.createElement("div");
 
-    appendText(left,"div",player.name,"card-title");
+    appendText(
+      left,"div",player.name,"card-title"
+    );
 
     appendText(
       left,"div",
@@ -1521,6 +1603,7 @@ function renderPlayers(players) {
 
     const right = document.createElement("div");
 
+    // Rostered count aligned to the far right.
     appendText(
       right,"div",player.owned,"card-owned"
     );
@@ -1577,7 +1660,8 @@ function renderPlayers(players) {
     );
 
     appendText(
-      gameArea,"div",game.state,"game-state"
+      gameArea,"div",game.state,
+      "game-state"
     );
 
     const scoreArea = document.createElement("div");
@@ -1615,10 +1699,12 @@ function renderPlayers(players) {
 }
 
 // ----------------------------
-// EVENTS
+// EVENT LISTENERS
 // ----------------------------
 
-loadButton.addEventListener("click",loadLeagues);
+loadButton.addEventListener(
+  "click",loadLeagues
+);
 
 $("modeCurrent").addEventListener(
   "click",() => setRosterMode("current")
@@ -1638,6 +1724,7 @@ $("refreshSchedule").addEventListener(
 
 $("gameWeek").addEventListener("change",() => {
   ++scoreVersion;
+
   weeklyData = new Map();
   scoreWeek = null;
 
@@ -1649,7 +1736,9 @@ $("gameWeek").addEventListener("change",() => {
   renderDashboard();
   loadSchedule();
 
-  if (loadedUsername) loadScores();
+  if (loadedUsername) {
+    loadScores();
+  }
 });
 
 $("sleeperUsername").addEventListener("input",() => {
@@ -1666,14 +1755,20 @@ $("sleeperUsername").addEventListener("input",() => {
     "Username changed. Load the new account.";
 });
 
+// League filters.
 for (const input of document.querySelectorAll(
   "#baseFilters input, #excludeBestBall, #excludeEmptyLeagues"
 )) {
-  input.addEventListener("change",renderDashboard);
+  input.addEventListener(
+    "change",renderDashboard
+  );
 }
 
+// Player Exposure filters.
 for (const id of [
-  "playerSearch","lineupAlertsOnly"
+  "playerSearch",
+  "lineupAlertsOnly",
+  "startersOnly"
 ]) {
   $(id).addEventListener(
     id === "playerSearch" ? "input" : "change",
@@ -1681,4 +1776,5 @@ for (const id of [
   );
 }
 
+// Initial schedule load.
 loadSchedule();
