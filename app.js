@@ -2590,12 +2590,24 @@ function renderDashboard() {
     ...groups.unverified.keys()
   ]);
 
-  const filtered = players.filter(p =>
-    `${p.name} ${p.position} ${p.team}`
-      .toLowerCase().includes(query) &&
-    (!startersOnly || p.starting > 0) &&
-    (!alertsOnly || alertedIds.has(p.id))
-  );
+  
+// v7.7.6 — Selected position filters
+const selectedPositions = new Set(
+  [...document.querySelectorAll(
+    ".position-filter:checked"
+  )].map(input => input.value)
+);
+
+const filtered = players.filter(p =>
+  selectedPositions.has(
+    String(p.position || "").toUpperCase()
+  ) &&
+  `${p.name} ${p.position} ${p.team}`
+    .toLowerCase().includes(query) &&
+  (!startersOnly || p.starting > 0) &&
+  (!alertsOnly || alertedIds.has(p.id))
+);
+
 
   text(
     "playerStatus",
@@ -2739,6 +2751,16 @@ for (const id of [
 ]) {
   $(id).addEventListener(
     id === "playerSearch" ? "input" : "change",
+    renderDashboard
+  );
+}
+
+// v7.7.6 — Refresh exposure when positions change
+for (const checkbox of document.querySelectorAll(
+  ".position-filter"
+)) {
+  checkbox.addEventListener(
+    "change",
     renderDashboard
   );
 }
