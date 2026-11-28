@@ -5,74 +5,143 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101319">
-<title>Sleeper Command Center v7.7.1</title>
+<title>Sleeper Command Center v7.7.4</title>
 <style>
 :root {
   color-scheme:dark;
-  --bg:#101319;--panel:#1b2029;--border:#303642;
-  --text:#f5f6fa;--muted:#a0a7b5;--accent:#9b91f6;
-  --green:#7fc9a4;--blue:#8ab4e8;--red:#f08080;
-  --orange:#f0ad65;--yellow:#f0c568;--purple:#b9a1f7;
+  --bg:#101319;
+  --panel:#1b2029;
+  --border:#303642;
+  --text:#f5f6fa;
+  --muted:#a0a7b5;
+  --accent:#9b91f6;
+  --green:#7fc9a4;
+  --blue:#8ab4e8;
+  --red:#f08080;
+  --orange:#f0ad65;
+  --yellow:#f0c568;
+  --purple:#b9a1f7;
 }
 *{box-sizing:border-box}
 body{
-  max-width:1250px;margin:auto;padding:22px;
-  background:var(--bg);color:var(--text);
+  max-width:1250px;
+  margin:auto;
+  padding:22px;
+  background:var(--bg);
+  color:var(--text);
   font:14px/1.5 -apple-system,BlinkMacSystemFont,
-  "Segoe UI",sans-serif;
+    "Segoe UI",sans-serif;
 }
 h1{font-size:clamp(24px,4vw,31px);margin:0}
 h2{font-size:18px;margin:0 0 12px}
 p,small,.muted{color:var(--muted)}
 .eyebrow{
-  color:var(--accent);font-size:11px;
-  letter-spacing:1.2px;font-weight:700;
+  color:var(--accent);
+  font-size:11px;
+  letter-spacing:1.2px;
+  font-weight:700;
 }
 .subtitle{margin:3px 0 18px}
 .panel{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;padding:16px;margin:15px 0;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  margin:15px 0;
 }
-.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
 .between{justify-content:space-between}
-.account{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.account{
+  display:flex;
+  align-items:end;
+  gap:10px;
+  flex-wrap:wrap;
+}
 .field{flex:1;min-width:160px}
 .field label{
-  display:block;color:var(--muted);
-  font-size:12px;margin-bottom:5px;
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:5px;
 }
 input[type=text],select{
-  width:100%;min-height:44px;background:#121720;
-  border:1px solid var(--border);border-radius:9px;
-  color:var(--text);padding:10px;font-size:16px;
+  width:100%;
+  min-height:44px;
+  background:#121720;
+  border:1px solid var(--border);
+  border-radius:9px;
+  color:var(--text);
+  padding:10px;
+  font-size:16px;
 }
 button{
-  min-height:42px;border:0;border-radius:9px;
-  padding:10px 15px;background:#7769df;color:white;
-  font-family:inherit;font-size:14px;font-weight:600;
+  min-height:42px;
+  border:0;
+  border-radius:9px;
+  padding:10px 15px;
+  background:#7769df;
+  color:white;
+  font-family:inherit;
+  font-size:14px;
+  font-weight:600;
   cursor:pointer;
 }
 button:hover{filter:brightness(1.12)}
 button:disabled{opacity:.5;cursor:wait}
 button:focus-visible,input:focus-visible,
 select:focus-visible,summary:focus-visible{
-  outline:2px solid var(--accent);outline-offset:2px;
+  outline:2px solid var(--accent);
+  outline-offset:2px;
 }
-.status{font-size:12px;margin:9px 0;color:var(--muted)}
-.filters{display:flex;flex-wrap:wrap;gap:8px 17px}
+.status{
+  font-size:12px;
+  margin:9px 0;
+  color:var(--muted);
+}
+.filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 17px;
+}
 .filters label{
-  display:inline-flex;align-items:center;
-  gap:7px;min-height:36px;cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:36px;
+  cursor:pointer;
 }
-.filters input{width:17px;height:17px;accent-color:var(--accent)}
-.filter-title{font-size:12px;color:var(--muted);margin:12px 0 6px}
+.filters input{
+  width:17px;
+  height:17px;
+  accent-color:var(--accent);
+}
+.filter-title{
+  font-size:12px;
+  color:var(--muted);
+  margin:12px 0 6px;
+}
 .mode-switch{
-  display:grid;grid-template-columns:1fr 1fr;gap:5px;
-  background:#121720;border:1px solid var(--border);
-  border-radius:11px;padding:5px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:5px;
+  background:#121720;
+  border:1px solid var(--border);
+  border-radius:11px;
+  padding:5px;
 }
-.mode-switch button{background:transparent;color:var(--muted)}
-.mode-switch button.active{background:#383453;color:white}
+.mode-switch button{
+  background:transparent;
+  color:var(--muted);
+}
+.mode-switch button.active{
+  background:#383453;
+  color:white;
+}
 .red{color:var(--red)!important}
 .orange{color:var(--orange)!important}
 .yellow{color:var(--yellow)!important}
@@ -80,174 +149,348 @@ select:focus-visible,summary:focus-visible{
 .blue{color:var(--blue)!important}
 .purple{color:var(--purple)!important}
 
-/* Collapsible sections */
+/* Collapsible dashboard sections */
 .dashboard-section{margin:20px 0}
 .section-toggle{
-  display:flex;justify-content:space-between;align-items:center;
-  gap:12px;padding:13px 15px;background:var(--panel);
-  border:1px solid var(--border);border-radius:12px;
-  cursor:pointer;list-style:none;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:13px 15px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:12px;
+  cursor:pointer;
+  list-style:none;
 }
 .section-toggle::-webkit-details-marker{display:none}
 .section-title{font-size:18px;font-weight:700}
 .section-description{
-  display:block;color:var(--muted);font-size:12px;margin-top:3px;
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-top:3px;
 }
 .section-chevron{
-  color:var(--muted);font-size:21px;
+  color:var(--muted);
+  font-size:21px;
   transition:transform .18s;
 }
-.dashboard-section[open] .section-chevron{transform:rotate(180deg)}
+.dashboard-section[open] .section-chevron{
+  transform:rotate(180deg);
+}
 .section-content{padding-top:13px}
 
-/* Portfolio */
+/* Portfolio Summary */
 .portfolio-row{
-  display:flex;justify-content:space-between;
-  gap:12px;padding:5px 0;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:5px 0;
 }
 .portfolio-row span:first-child{color:var(--muted)}
 .portfolio-row span:last-child{
-  font-weight:650;font-variant-numeric:tabular-nums;
+  font-weight:650;
+  font-variant-numeric:tabular-nums;
 }
 .portfolio-standings{
-  display:flex;flex-direction:column;gap:10px;
-  margin-top:16px;padding-top:14px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:16px;
+  padding-top:14px;
   border-top:1px solid var(--border);
 }
 .portfolio-standing-row{
   display:grid;
   grid-template-columns:minmax(0,1fr) 55px 45px 62px;
-  align-items:center;column-gap:9px;width:100%;
+  align-items:center;
+  column-gap:9px;
+  width:100%;
 }
 .portfolio-standing-name{
-  min-width:0;color:var(--text);font-size:13px;
-  font-weight:500;overflow-wrap:anywhere;
+  min-width:0;
+  color:var(--text);
+  font-size:13px;
+  font-weight:500;
+  overflow-wrap:anywhere;
 }
 .portfolio-standing-place{
-  font-size:13px;font-weight:650;text-align:right;
-  font-variant-numeric:tabular-nums;white-space:nowrap;
+  font-size:13px;
+  font-weight:650;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
 }
 .portfolio-standing-header{
-  color:var(--muted);font-size:11px;text-align:right;
+  color:var(--muted);
+  font-size:11px;
+  text-align:right;
 }
 .portfolio-standing-header:first-child{text-align:left}
 
-/* Alerts */
+/* League filters */
+.league-filter-panel .filter-list{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  flex-wrap:nowrap;
+  gap:5px;
+}
+.league-filter-panel .filter-list label{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  width:100%;
+  gap:11px;
+  min-height:35px;
+  margin:0;
+}
+.league-filter-panel .filter-list input{
+  flex:0 0 17px;
+  margin:0;
+}
+.league-filter-panel .filter-title{
+  margin:16px 0 8px;
+}
+.filter-count{
+  color:var(--muted);
+  font-size:.9em;
+  font-weight:400;
+}
+
+/* Lineup alerts */
 .alert-box{
-  background:#201d24;border:1px solid #49383e;
-  border-radius:12px;padding:14px;margin-top:12px;
+  background:#201d24;
+  border:1px solid #49383e;
+  border-radius:12px;
+  padding:14px;
+  margin-top:12px;
 }
 .question-box{
-  background:#211f1c;border:1px solid #554536;
-  border-radius:12px;padding:14px;margin-top:12px;
+  background:#211f1c;
+  border:1px solid #554536;
+  border-radius:12px;
+  padding:0;
+  margin-top:12px;
+  overflow:hidden;
+}
+.question-box>summary{
+  display:block;
+  list-style:none;
+  padding:14px;
+  cursor:pointer;
+}
+.question-box>summary::-webkit-details-marker{
+  display:none;
+}
+.question-box>summary:hover{
+  background:rgba(240,173,101,.035);
+}
+.question-heading{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.question-chevron{
+  color:var(--orange);
+  font-size:21px;
+  transition:transform .18s;
+}
+.question-box[open] .question-chevron{
+  transform:rotate(180deg);
+}
+.question-details{
+  padding:0 14px 14px;
+}
+.question-details .alert-item:first-child{
+  margin-top:0;
 }
 .big-number{
-  font-size:27px;font-weight:700;
+  font-size:27px;
+  font-weight:700;
   font-variant-numeric:tabular-nums;
 }
-.alert-item{border-top:1px solid var(--border);padding:12px 0}
+.alert-item{
+  border-top:1px solid var(--border);
+  padding:12px 0;
+}
 .alert-item:first-child{margin-top:10px}
 .tag{
-  display:inline-block;border:1px solid currentColor;
-  border-radius:5px;padding:2px 6px;
-  font-size:11px;font-weight:650;white-space:nowrap;
+  display:inline-block;
+  border:1px solid currentColor;
+  border-radius:5px;
+  padding:2px 6px;
+  font-size:11px;
+  font-weight:650;
+  white-space:nowrap;
 }
-.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tags{
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+}
 .alert-league-list{
-  display:grid;gap:7px;margin:10px 0 4px;padding-left:10px;
+  display:grid;
+  gap:7px;
+  margin:10px 0 4px;
+  padding-left:10px;
 }
 .alert-league-item{
-  display:flex;align-items:flex-start;gap:10px;
-  color:#d5d9e2;font-size:13px;line-height:1.5;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  color:#d5d9e2;
+  font-size:13px;
+  line-height:1.5;
 }
 .alert-league-bullet{
-  color:var(--red);font-weight:700;flex-shrink:0;
+  color:var(--red);
+  font-weight:700;
+  flex-shrink:0;
+}
+.question-details .alert-league-bullet{
+  color:var(--orange);
 }
 .neutral-details{
-  margin-top:12px;padding:12px;border:1px solid var(--border);
+  margin-top:12px;
+  padding:12px;
+  border:1px solid var(--border);
   border-radius:10px;
 }
 summary{cursor:pointer}
 .neutral-details summary{color:var(--muted)}
 
-/* Lineup suggestions */
+/* Lineup Suggestions */
 #suggestionsList{display:grid;gap:12px}
 .league-card{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;overflow:hidden;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
 }
-.league-card>summary{list-style:none;padding:16px}
-.league-card>summary::-webkit-details-marker{display:none}
+.league-card>summary{
+  list-style:none;
+  padding:16px;
+}
+.league-card>summary::-webkit-details-marker{
+  display:none;
+}
 .league-title{
-  font-size:17px;font-weight:700;overflow-wrap:anywhere;
+  font-size:17px;
+  font-weight:700;
+  overflow-wrap:anywhere;
 }
 .league-heading{
-  display:flex;justify-content:space-between;
-  align-items:start;gap:14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:start;
+  gap:14px;
 }
-.suggestion-count{text-align:right;flex-shrink:0}
+.suggestion-count{
+  text-align:right;
+  flex-shrink:0;
+}
 .suggestion-count strong{
-  display:block;font-size:24px;line-height:1.1;
+  display:block;
+  font-size:24px;
+  line-height:1.1;
 }
 .league-metrics{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:8px;margin:10px 0 15px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin:10px 0 15px;
 }
 .metric{
-  border-right:1px solid var(--border);padding-right:6px;
+  border-right:1px solid var(--border);
+  padding-right:6px;
 }
 .metric:last-child{border:0}
 .metric strong{display:block;font-size:13px}
 .metric span{font-size:11px;color:var(--muted)}
 .suggestion-totals{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:8px;
 }
 .suggestion-totals span{
-  display:block;color:var(--muted);font-size:11px;
+  display:block;
+  color:var(--muted);
+  font-size:11px;
 }
-.suggestion-totals strong{display:block;font-size:19px}
+.suggestion-totals strong{
+  display:block;
+  font-size:19px;
+}
 .suggestion-body{
-  border-top:1px solid var(--border);padding:10px 16px 16px;
+  border-top:1px solid var(--border);
+  padding:10px 16px 16px;
 }
 .suggestion{
-  padding:11px 0;border-bottom:1px solid var(--border);
+  padding:11px 0;
+  border-bottom:1px solid var(--border);
 }
 .suggestion:last-child{border:0}
 .suggestion-head{
-  display:flex;align-items:start;
-  justify-content:space-between;gap:8px;
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:8px;
 }
 .suggestion-name{font-weight:650}
 .suggestion-meta,.suggestion-note{
-  color:var(--muted);font-size:12px;margin-top:4px;
+  color:var(--muted);
+  font-size:12px;
+  margin-top:4px;
 }
 
-/* Player exposure */
+/* Player Exposure */
 .toolbar{
-  display:flex;justify-content:space-between;
-  align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin:0 0 10px;
 }
 .search{width:min(100%,360px)!important}
 .table-wrap{
-  overflow-x:auto;border:1px solid var(--border);
+  overflow-x:auto;
+  border:1px solid var(--border);
   border-radius:12px;
 }
-table{border-collapse:collapse;width:100%;min-width:1040px}
+table{
+  border-collapse:collapse;
+  width:100%;
+  min-width:1040px;
+}
 th,td{
   border-bottom:1px solid var(--border);
-  padding:10px;text-align:left;font-size:12px;
+  padding:10px;
+  text-align:left;
+  font-size:12px;
 }
 th{color:var(--muted)}
 .player-button{
-  background:none;color:var(--accent);padding:0;text-align:left;
+  background:none;
+  color:var(--accent);
+  padding:0;
+  text-align:left;
 }
 .player-button:hover{background:none}
 .detail-row td{background:#202632}
-.league-list{display:grid;gap:10px;padding:8px 0}
+.league-list{
+  display:grid;
+  gap:10px;
+  padding:8px 0;
+}
 .league-item{
-  display:grid;grid-template-columns:minmax(0,1fr) 90px 52px;
-  gap:8px;align-items:center;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 90px 52px;
+  gap:8px;
+  align-items:center;
 }
 .league-item span:first-child{overflow-wrap:anywhere}
 .league-points{text-align:right;font-weight:650}
@@ -261,37 +504,51 @@ th{color:var(--muted)}
 .injury-other{color:var(--yellow)!important}
 #mobilePlayerCards{display:none}
 .player-card{
-  background:var(--panel);border:1px solid var(--border);
-  border-radius:14px;padding:16px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
 }
 .card-header{
-  width:100%;display:flex;justify-content:space-between;
-  align-items:flex-start;gap:12px;background:transparent;
-  padding:0;text-align:left;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  background:transparent;
+  padding:0;
+  text-align:left;
 }
 .card-header:hover{background:transparent}
 .card-header>div:first-child{flex:1;min-width:0}
 .card-header>div:last-child{
-  margin-left:auto;text-align:right;
+  margin-left:auto;
+  text-align:right;
 }
 .card-title{font-size:16px;font-weight:700}
 .card-owned{font-size:25px;font-weight:700}
 .card-sub{font-size:12px;color:var(--muted)}
 .card-stats{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:8px;margin:15px 0;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin:15px 0;
 }
 .card-stat-label{font-size:11px;color:var(--muted)}
 .card-stat-value{font-size:17px;font-weight:650}
 .score-summary{
-  display:flex;justify-content:space-between;
-  gap:12px;align-items:center;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
 }
 .score-summary>div:last-child{
-  text-align:right;flex-shrink:0;
+  text-align:right;
+  flex-shrink:0;
 }
 .card-details{
-  margin-top:15px;padding-top:13px;
+  margin-top:15px;
+  padding-top:13px;
   border-top:1px solid var(--border);
 }
 [hidden]{display:none!important}
@@ -325,15 +582,146 @@ th{color:var(--muted)}
   .portfolio-standing-header{font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){
-  .section-chevron{transition:none}
+  .section-chevron,.question-chevron{transition:none}
 }
+
+/* =========================================
+   v7.7.3 — Player Exposure Position Colors
+   ========================================= */
+
+/* Default player card */
+.player-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transition: background-color .2s ease,
+              border-color .2s ease;
+}
+
+/* Quarterback — subtle pink */
+.player-card.position-qb {
+  background: #29212b;
+  border-color: #493346;
+}
+
+/* Running Back — subtle green */
+.player-card.position-rb {
+  background: #1d2926;
+  border-color: #345149;
+}
+
+/* Wide Receiver — subtle blue */
+.player-card.position-wr {
+  background: #1c2733;
+  border-color: #344c62;
+}
+
+/* Tight End — subtle orange */
+.player-card.position-te {
+  background: #2b261e;
+  border-color: #51432e;
+}
+
+/* Kicker — subtle purple */
+.player-card.position-k {
+  background: #252237;
+  border-color: #453c60;
+}
+
+/* Defense / Special Teams — neutral */
+.player-card.position-def,
+.player-card.position-dst {
+  background: #22262d;
+  border-color: #3a404b;
+}
+
+/* Other positions retain the normal card style */
+.player-card.position-other {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+/* Make ALL roster assignment counts neutral.
+   This overrides the existing status colors
+   only within mobile player cards. */
+.player-card .card-stat-value,
+.player-card .card-stat-value.status-starting,
+.player-card .card-stat-value.status-bench,
+.player-card .card-stat-value.status-not-starting,
+.player-card .card-stat-value.status-ir,
+.player-card .card-stat-value.status-taxi {
+  color: var(--text) !important;
+}
+
+/* Keep the labels muted gray */
+.player-card .card-stat-label {
+  color: var(--muted);
+}
+
+/* Keep injury status colors unchanged */
+.player-card .injury-out,
+.player-card .injury-doubtful {
+  color: var(--red) !important;
+}
+
+.player-card .injury-questionable {
+  color: var(--orange) !important;
+}
+
+/* Keep expanded league assignment statuses colored */
+.player-card .league-item .status-starting {
+  color: var(--green);
+}
+
+.player-card .league-item .status-bench,
+.player-card .league-item .status-not-starting {
+  color: var(--blue);
+}
+
+.player-card .league-item .status-ir {
+  color: var(--red);
+}
+
+.player-card .league-item .status-taxi {
+  color: var(--purple);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-card {
+    transition: none;
+  }
+}
+
+/* v7.7.4 — season-to-date PPR positional ranking */
+.player-name-line {
+  display:flex;
+  align-items:baseline;
+  flex-wrap:wrap;
+  column-gap:8px;
+  row-gap:0;
+  min-width:0;
+}
+.player-position-rank {
+  font-size:inherit;
+  font-weight:700;
+  white-space:nowrap;
+}
+.position-qb .player-position-rank {color:#d68fb0}
+.position-rb .player-position-rank {color:#70bea1}
+.position-wr .player-position-rank {color:#79b7dc}
+.position-te .player-position-rank {color:#d9a665}
+.position-k .player-position-rank {color:#a99ad9}
+.position-def .player-position-rank,
+.position-dst .player-position-rank {color:#aab4c2}
+
 </style>
 </head>
 <body>
 
 <div class="eyebrow">FANTASY PORTFOLIO</div>
 <h1>Sleeper Command Center</h1>
-<p class="subtitle">Your leagues. Your players. One dashboard.</p>
+<p class="subtitle">
+  Your leagues. Your players. One dashboard.
+</p>
 
 <section class="panel">
   <div class="account">
@@ -343,7 +731,9 @@ th{color:var(--muted)}
         placeholder="Enter Sleeper username"
         autocomplete="off">
     </div>
-    <button id="loadButton" type="button">Load My Leagues</button>
+    <button id="loadButton" type="button">
+      Load My Leagues
+    </button>
   </div>
   <p id="status" class="status" role="status">
     Enter a username and load leagues.
@@ -364,13 +754,13 @@ th{color:var(--muted)}
   </p>
 </section>
 
+<!-- Portfolio Summary -->
 <details id="portfolioSection" class="dashboard-section">
   <summary class="section-toggle">
     <div>
       <span class="section-title">Portfolio Summary</span>
-      <span id="portfolioRefreshTime" class="section-description">
-        Not loaded yet
-      </span>
+      <span id="portfolioRefreshTime"
+        class="section-description">Not loaded yet</span>
     </div>
     <span class="section-chevron" aria-hidden="true">⌄</span>
   </summary>
@@ -384,7 +774,8 @@ th{color:var(--muted)}
         <span>Unique players</span>
         <span id="uniqueCount">--</span>
       </div>
-      <div id="portfolioStandings" class="portfolio-standings"></div>
+      <div id="portfolioStandings"
+        class="portfolio-standings"></div>
       <p class="status">
         Chopped leagues are excluded from the ranked list only.
         *Place is estimated from record and PF.
@@ -396,64 +787,116 @@ th{color:var(--muted)}
   </div>
 </details>
 
-<section class="panel">
+<!-- Clean league filters -->
+<section class="panel league-filter-panel">
   <h2>League filters</h2>
-  <div class="filters">
+
+  <div class="filters filter-list">
     <label>
-      <input id="excludeEmptyLeagues" type="checkbox" checked>
+      <input id="excludeEmptyLeagues"
+        type="checkbox" checked>
       Exclude empty leagues
     </label>
   </div>
+
   <div class="filter-title">League structure</div>
-  <div id="baseFilters" class="filters">
-    <label><input type="checkbox" value="Redraft" checked>Redraft</label>
-    <label><input type="checkbox" value="Keeper" checked>Keeper</label>
-    <label><input type="checkbox" value="Dynasty" checked>Dynasty</label>
-    <label><input type="checkbox" value="Chopped" checked>Chopped</label>
-    <label><input type="checkbox" value="Other" checked>Other</label>
+
+  <div id="baseFilters" class="filters filter-list">
+    <label>
+      <input type="checkbox" value="Dynasty" checked>
+      <span>Dynasty
+        <span id="countDynasty" class="filter-count">(—)</span>
+      </span>
+    </label>
+    <label>
+      <input type="checkbox" value="Redraft" checked>
+      <span>Redraft
+        <span id="countRedraft" class="filter-count">(—)</span>
+      </span>
+    </label>
+    <label>
+      <input type="checkbox" value="Keeper" checked>
+      <span>Keeper
+        <span id="countKeeper" class="filter-count">(—)</span>
+      </span>
+    </label>
+    <label>
+      <input type="checkbox" value="Chopped" checked>
+      <span>Chopped
+        <span id="countChopped" class="filter-count">(—)</span>
+      </span>
+    </label>
+    <label>
+      <input type="checkbox" value="Other" checked>
+      <span>Other
+        <span id="countOther" class="filter-count">(—)</span>
+      </span>
+    </label>
   </div>
+
   <div class="filter-title">Additional format</div>
-  <div class="filters">
+
+  <div class="filters filter-list">
     <label>
       <input id="excludeBestBall" type="checkbox">
-      Exclude Best Ball
+      <span>Exclude Best Ball
+        <span id="countBestBall" class="filter-count">(—)</span>
+      </span>
     </label>
   </div>
   <p id="emptyLeagueStatus" class="status"></p>
 </section>
 
+<!-- Lineup Alerts -->
 <section class="panel">
   <h2>Lineup Alerts</h2>
   <p class="status">
     Red: Bye, Out, IR, Doubtful.
-    Orange: Questionable. Injury data reflects current status.
+    Orange: Questionable.
+    Injury designations reflect current data.
   </p>
 
   <div class="alert-box">
     <strong class="red">POTENTIAL ACTION NEEDED</strong>
     <div class="row">
-      <span id="highPriorityCount" class="big-number red">--</span>
+      <span id="highPriorityCount"
+        class="big-number red">--</span>
       <small>
-        lineups · <strong id="highPriorityPlayers">--</strong>
+        lineups ·
+        <strong id="highPriorityPlayers">--</strong>
         unique players
       </small>
     </div>
     <div id="highPriorityList"></div>
   </div>
 
-  <div class="question-box">
-    <strong class="orange">QUESTIONABLE · UPCOMING</strong>
-    <div class="row">
-      <span id="questionableCount" class="big-number orange">--</span>
-      <small>
-        lineups · <strong id="questionablePlayers">--</strong>
-        unique players
-      </small>
-    </div>
-  </div>
+  <!-- Questionable starts collapsed -->
+  <details id="questionableSection" class="question-box">
+    <summary>
+      <div class="question-heading">
+        <strong class="orange">
+          QUESTIONABLE · UPCOMING
+        </strong>
+        <span class="question-chevron"
+          aria-hidden="true">⌄</span>
+      </div>
+      <div class="row">
+        <span id="questionableCount"
+          class="big-number orange">--</span>
+        <small>
+          lineups ·
+          <strong id="questionablePlayers">--</strong>
+          unique players
+        </small>
+      </div>
+    </summary>
+    <div id="questionableList" class="question-details"></div>
+  </details>
 
   <details class="neutral-details">
-    <summary id="lockedSummary">Locked / Completed</summary>
+    <summary id="lockedSummary">
+      Locked / Completed
+    </summary>
     <p class="status">
       Game started or finished. Injury timing is unknown.
     </p>
@@ -470,6 +913,7 @@ th{color:var(--muted)}
   <p id="alertStatus" class="status"></p>
 </section>
 
+<!-- Schedule and scoring -->
 <section class="panel">
   <h2>NFL Schedule & Scoring</h2>
   <div class="account">
@@ -489,11 +933,13 @@ th{color:var(--muted)}
   <p id="scoreUpdated" class="status"></p>
 </section>
 
+<!-- Lineup Suggestions -->
 <details id="suggestionsSection" class="dashboard-section">
   <summary class="section-toggle">
     <div>
       <span class="section-title">Lineup Suggestions</span>
-      <span id="suggestionsSectionSummary" class="section-description">
+      <span id="suggestionsSectionSummary"
+        class="section-description">
         Load leagues to see current-week suggestions.
       </span>
     </div>
@@ -516,11 +962,13 @@ th{color:var(--muted)}
   </div>
 </details>
 
+<!-- Player Exposure -->
 <details id="exposureSection" class="dashboard-section">
   <summary class="section-toggle">
     <div>
       <span class="section-title">Player Exposure</span>
-      <span id="exposureSectionSummary" class="section-description">
+      <span id="exposureSectionSummary"
+        class="section-description">
         Load leagues to see player exposure.
       </span>
     </div>
@@ -547,11 +995,17 @@ th{color:var(--muted)}
       <table>
         <thead>
           <tr>
-            <th>Player</th><th>Position / Team</th>
-            <th>Rostered</th><th>Start</th>
-            <th id="benchHeading">Bench</th><th>IR</th><th>Taxi</th>
-            <th>Current injury</th><th>Opponent</th>
-            <th>Avg Pts</th><th>Game</th>
+            <th>Player</th>
+            <th>Position / Team</th>
+            <th>Rostered</th>
+            <th>Start</th>
+            <th id="benchHeading">Bench</th>
+            <th>IR</th>
+            <th>Taxi</th>
+            <th>Current injury</th>
+            <th>Opponent</th>
+            <th>Avg Pts</th>
+            <th>Game</th>
           </tr>
         </thead>
         <tbody id="playerTableBody"></tbody>
