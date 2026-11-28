@@ -3,474 +3,329 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101319">
-<title>Sleeper Command Center v7.5</title>
+<title>Sleeper Command Center v7.7.1</title>
 <style>
 :root {
-  color-scheme: dark;
-  --bg: #101319;
-  --panel: #1b2029;
-  --inner: #151a22;
-  --border: #303642;
-  --text: #f5f6fa;
-  --muted: #a0a7b5;
-  --accent: #9b91f6;
-  --green: #7fc9a4;
-  --blue: #8ab4e8;
-  --red: #f08080;
-  --orange: #f0ad65;
-  --yellow: #f0c568;
-  --purple: #b9a1f7;
+  color-scheme:dark;
+  --bg:#101319;--panel:#1b2029;--border:#303642;
+  --text:#f5f6fa;--muted:#a0a7b5;--accent:#9b91f6;
+  --green:#7fc9a4;--blue:#8ab4e8;--red:#f08080;
+  --orange:#f0ad65;--yellow:#f0c568;--purple:#b9a1f7;
 }
-* { box-sizing: border-box; }
-body {
-  max-width: 1250px;
-  margin: auto;
-  padding: 22px;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+*{box-sizing:border-box}
+body{
+  max-width:1250px;margin:auto;padding:22px;
+  background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,
+  "Segoe UI",sans-serif;
 }
-h1 { font-size: clamp(24px,4vw,31px); margin: 0; }
-h2 { font-size: 18px; margin: 0 0 12px; }
-p, small, .muted { color: var(--muted); }
-.eyebrow {
-  color: var(--accent);
-  font-size: 11px;
-  letter-spacing: 1.2px;
-  font-weight: 700;
+h1{font-size:clamp(24px,4vw,31px);margin:0}
+h2{font-size:18px;margin:0 0 12px}
+p,small,.muted{color:var(--muted)}
+.eyebrow{
+  color:var(--accent);font-size:11px;
+  letter-spacing:1.2px;font-weight:700;
 }
-.subtitle { margin: 3px 0 18px; }
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
-  margin: 15px 0;
+.subtitle{margin:3px 0 18px}
+.panel{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;padding:16px;margin:15px 0;
 }
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.between{justify-content:space-between}
+.account{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.field{flex:1;min-width:160px}
+.field label{
+  display:block;color:var(--muted);
+  font-size:12px;margin-bottom:5px;
 }
-.between { justify-content: space-between; }
-.account {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
+input[type=text],select{
+  width:100%;min-height:44px;background:#121720;
+  border:1px solid var(--border);border-radius:9px;
+  color:var(--text);padding:10px;font-size:16px;
 }
-.field { flex: 1; min-width: 160px; }
-.field label {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 5px;
+button{
+  min-height:42px;border:0;border-radius:9px;
+  padding:10px 15px;background:#7769df;color:white;
+  font-family:inherit;font-size:14px;font-weight:600;
+  cursor:pointer;
 }
-input[type=text], select {
-  width: 100%;
-  min-height: 44px;
-  background: #121720;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  color: var(--text);
-  padding: 10px;
-  font-size: 16px;
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.5;cursor:wait}
+button:focus-visible,input:focus-visible,
+select:focus-visible,summary:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
 }
-button {
-  min-height: 42px;
-  border: 0;
-  border-radius: 9px;
-  padding: 10px 15px;
-  background: #7769df;
-  color: white;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
+.status{font-size:12px;margin:9px 0;color:var(--muted)}
+.filters{display:flex;flex-wrap:wrap;gap:8px 17px}
+.filters label{
+  display:inline-flex;align-items:center;
+  gap:7px;min-height:36px;cursor:pointer;
 }
-button:hover { filter: brightness(1.12); }
-button:disabled { opacity: .5; cursor: wait; }
-button:focus-visible, input:focus-visible,
-select:focus-visible, summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.filters input{width:17px;height:17px;accent-color:var(--accent)}
+.filter-title{font-size:12px;color:var(--muted);margin:12px 0 6px}
+.mode-switch{
+  display:grid;grid-template-columns:1fr 1fr;gap:5px;
+  background:#121720;border:1px solid var(--border);
+  border-radius:11px;padding:5px;
 }
-.status {
-  font-size: 12px;
-  margin: 9px 0;
-  color: var(--muted);
-}
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 17px;
-}
-.filters label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  cursor: pointer;
-}
-.filters input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--accent);
-}
-.filter-title {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 12px 0 6px;
-}
-.mode-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  background: #121720;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  padding: 5px;
-}
-.mode-switch button {
-  background: transparent;
-  color: var(--muted);
-}
-.mode-switch button.active {
-  background: #383453;
-  color: white;
-}
-.portfolio-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  gap: 10px;
-}
-.portfolio-row span:first-child { color: var(--muted); }
-.portfolio-row span:last-child {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.red { color: var(--red)!important; }
-.orange { color: var(--orange)!important; }
-.yellow { color: var(--yellow)!important; }
-.green { color: var(--green)!important; }
-.blue { color: var(--blue)!important; }
-.purple { color: var(--purple)!important; }
-.alert-box {
-  background: #201d24;
-  border: 1px solid #49383e;
-  border-radius: 12px;
-  padding: 14px;
-  margin-top: 12px;
-}
-.question-box {
-  background: #211f1c;
-  border: 1px solid #554536;
-  border-radius: 12px;
-  padding: 14px;
-  margin-top: 12px;
-}
-.big-number {
-  font-size: 27px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.alert-item {
-  border-top: 1px solid var(--border);
-  padding: 12px 0;
-}
-.alert-item:first-child { margin-top: 10px; }
-.tag {
-  display: inline-block;
-  border: 1px solid currentColor;
-  border-radius: 5px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.tags {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.alert-league-list {
-  display: grid;
-  gap: 7px;
-  margin: 10px 0 4px;
-  padding-left: 10px;
-}
-.alert-league-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: #d5d9e2;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.alert-league-bullet {
-  color: var(--red);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.neutral-details {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-summary { cursor: pointer; }
-.neutral-details summary { color: var(--muted); }
+.mode-switch button{background:transparent;color:var(--muted)}
+.mode-switch button.active{background:#383453;color:white}
+.red{color:var(--red)!important}
+.orange{color:var(--orange)!important}
+.yellow{color:var(--yellow)!important}
+.green{color:var(--green)!important}
+.blue{color:var(--blue)!important}
+.purple{color:var(--purple)!important}
 
 /* Collapsible sections */
-.dashboard-section { margin: 20px 0; }
-.section-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 15px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  cursor: pointer;
-  list-style: none;
+.dashboard-section{margin:20px 0}
+.section-toggle{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:12px;padding:13px 15px;background:var(--panel);
+  border:1px solid var(--border);border-radius:12px;
+  cursor:pointer;list-style:none;
 }
-.section-toggle::-webkit-details-marker { display: none; }
-.section-title { font-size: 18px; font-weight: 700; }
-.section-description {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 3px;
+.section-toggle::-webkit-details-marker{display:none}
+.section-title{font-size:18px;font-weight:700}
+.section-description{
+  display:block;color:var(--muted);font-size:12px;margin-top:3px;
 }
-.section-chevron {
-  color: var(--muted);
-  font-size: 21px;
-  transition: transform .18s ease;
+.section-chevron{
+  color:var(--muted);font-size:21px;
+  transition:transform .18s;
 }
-.dashboard-section[open] .section-chevron {
-  transform: rotate(180deg);
-}
-.section-content { padding-top: 13px; }
+.dashboard-section[open] .section-chevron{transform:rotate(180deg)}
+.section-content{padding-top:13px}
 
-/* Existing league suggestion tiles */
-#suggestionsList { display: grid; gap: 12px; }
-.league-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
+/* Portfolio */
+.portfolio-row{
+  display:flex;justify-content:space-between;
+  gap:12px;padding:5px 0;
 }
-.league-card > summary {
-  list-style: none;
-  padding: 16px;
+.portfolio-row span:first-child{color:var(--muted)}
+.portfolio-row span:last-child{
+  font-weight:650;font-variant-numeric:tabular-nums;
 }
-.league-card > summary::-webkit-details-marker {
-  display: none;
+.portfolio-standings{
+  display:flex;flex-direction:column;gap:10px;
+  margin-top:16px;padding-top:14px;
+  border-top:1px solid var(--border);
 }
-.league-title {
-  font-size: 17px;
-  font-weight: 700;
-  overflow-wrap: anywhere;
+.portfolio-standing-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 55px 45px 62px;
+  align-items:center;column-gap:9px;width:100%;
 }
-.league-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 14px;
+.portfolio-standing-name{
+  min-width:0;color:var(--text);font-size:13px;
+  font-weight:500;overflow-wrap:anywhere;
 }
-.suggestion-count {
-  text-align: right;
-  flex-shrink: 0;
+.portfolio-standing-place{
+  font-size:13px;font-weight:650;text-align:right;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
 }
-.suggestion-count strong {
-  display: block;
-  font-size: 24px;
-  line-height: 1.1;
+.portfolio-standing-header{
+  color:var(--muted);font-size:11px;text-align:right;
 }
-.league-metrics {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 8px;
-  margin: 10px 0 15px;
+.portfolio-standing-header:first-child{text-align:left}
+
+/* Alerts */
+.alert-box{
+  background:#201d24;border:1px solid #49383e;
+  border-radius:12px;padding:14px;margin-top:12px;
 }
-.metric {
-  border-right: 1px solid var(--border);
-  padding-right: 6px;
+.question-box{
+  background:#211f1c;border:1px solid #554536;
+  border-radius:12px;padding:14px;margin-top:12px;
 }
-.metric:last-child { border: 0; }
-.metric strong { display: block; font-size: 13px; }
-.metric span { font-size: 11px; color: var(--muted); }
-.suggestion-totals {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 8px;
+.big-number{
+  font-size:27px;font-weight:700;
+  font-variant-numeric:tabular-nums;
 }
-.suggestion-totals span {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
+.alert-item{border-top:1px solid var(--border);padding:12px 0}
+.alert-item:first-child{margin-top:10px}
+.tag{
+  display:inline-block;border:1px solid currentColor;
+  border-radius:5px;padding:2px 6px;
+  font-size:11px;font-weight:650;white-space:nowrap;
 }
-.suggestion-totals strong {
-  display: block;
-  font-size: 19px;
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.alert-league-list{
+  display:grid;gap:7px;margin:10px 0 4px;padding-left:10px;
 }
-.suggestion-body {
-  border-top: 1px solid var(--border);
-  padding: 10px 16px 16px;
+.alert-league-item{
+  display:flex;align-items:flex-start;gap:10px;
+  color:#d5d9e2;font-size:13px;line-height:1.5;
 }
-.suggestion {
-  padding: 11px 0;
-  border-bottom: 1px solid var(--border);
+.alert-league-bullet{
+  color:var(--red);font-weight:700;flex-shrink:0;
 }
-.suggestion:last-child { border: 0; }
-.suggestion-head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 8px;
+.neutral-details{
+  margin-top:12px;padding:12px;border:1px solid var(--border);
+  border-radius:10px;
 }
-.suggestion-name { font-weight: 650; }
-.suggestion-meta, .suggestion-note {
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 4px;
+summary{cursor:pointer}
+.neutral-details summary{color:var(--muted)}
+
+/* Lineup suggestions */
+#suggestionsList{display:grid;gap:12px}
+.league-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden;
+}
+.league-card>summary{list-style:none;padding:16px}
+.league-card>summary::-webkit-details-marker{display:none}
+.league-title{
+  font-size:17px;font-weight:700;overflow-wrap:anywhere;
+}
+.league-heading{
+  display:flex;justify-content:space-between;
+  align-items:start;gap:14px;
+}
+.suggestion-count{text-align:right;flex-shrink:0}
+.suggestion-count strong{
+  display:block;font-size:24px;line-height:1.1;
+}
+.league-metrics{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;margin:10px 0 15px;
+}
+.metric{
+  border-right:1px solid var(--border);padding-right:6px;
+}
+.metric:last-child{border:0}
+.metric strong{display:block;font-size:13px}
+.metric span{font-size:11px;color:var(--muted)}
+.suggestion-totals{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+.suggestion-totals span{
+  display:block;color:var(--muted);font-size:11px;
+}
+.suggestion-totals strong{display:block;font-size:19px}
+.suggestion-body{
+  border-top:1px solid var(--border);padding:10px 16px 16px;
+}
+.suggestion{
+  padding:11px 0;border-bottom:1px solid var(--border);
+}
+.suggestion:last-child{border:0}
+.suggestion-head{
+  display:flex;align-items:start;
+  justify-content:space-between;gap:8px;
+}
+.suggestion-name{font-weight:650}
+.suggestion-meta,.suggestion-note{
+  color:var(--muted);font-size:12px;margin-top:4px;
 }
 
 /* Player exposure */
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0 0 10px;
+.toolbar{
+  display:flex;justify-content:space-between;
+  align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 10px;
 }
-.search { width: min(100%,360px)!important; }
-.table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+.search{width:min(100%,360px)!important}
+.table-wrap{
+  overflow-x:auto;border:1px solid var(--border);
+  border-radius:12px;
 }
-table {
-  border-collapse: collapse;
-  width: 100%;
-  min-width: 1040px;
+table{border-collapse:collapse;width:100%;min-width:1040px}
+th,td{
+  border-bottom:1px solid var(--border);
+  padding:10px;text-align:left;font-size:12px;
 }
-th, td {
-  border-bottom: 1px solid var(--border);
-  padding: 10px;
-  text-align: left;
-  font-size: 12px;
+th{color:var(--muted)}
+.player-button{
+  background:none;color:var(--accent);padding:0;text-align:left;
 }
-th { color: var(--muted); }
-.player-button {
-  background: none;
-  color: var(--accent);
-  padding: 0;
-  text-align: left;
+.player-button:hover{background:none}
+.detail-row td{background:#202632}
+.league-list{display:grid;gap:10px;padding:8px 0}
+.league-item{
+  display:grid;grid-template-columns:minmax(0,1fr) 90px 52px;
+  gap:8px;align-items:center;
 }
-.player-button:hover { background: none; }
-.detail-row td { background: #202632; }
-.league-list {
-  display: grid;
-  gap: 10px;
-  padding: 8px 0;
+.league-item span:first-child{overflow-wrap:anywhere}
+.league-points{text-align:right;font-weight:650}
+.status-starting{color:var(--green)}
+.status-bench,.status-not-starting{color:var(--blue)}
+.status-ir{color:var(--red)}
+.status-taxi{color:var(--purple)}
+.injury-out,.injury-doubtful{color:var(--red)!important}
+.injury-questionable{color:var(--orange)!important}
+.injury-healthy{color:var(--muted)!important}
+.injury-other{color:var(--yellow)!important}
+#mobilePlayerCards{display:none}
+.player-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;padding:16px;
 }
-.league-item {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) 90px 52px;
-  gap: 8px;
-  align-items: center;
+.card-header{
+  width:100%;display:flex;justify-content:space-between;
+  align-items:flex-start;gap:12px;background:transparent;
+  padding:0;text-align:left;
 }
-.league-item span:first-child { overflow-wrap: anywhere; }
-.league-points { text-align: right; font-weight: 650; }
-.status-starting { color: var(--green); }
-.status-bench, .status-not-starting { color: var(--blue); }
-.status-ir { color: var(--red); }
-.status-taxi { color: var(--purple); }
-.injury-out, .injury-doubtful { color: var(--red)!important; }
-.injury-questionable { color: var(--orange)!important; }
-.injury-healthy { color: var(--muted)!important; }
-.injury-other { color: var(--yellow)!important; }
-#mobilePlayerCards { display: none; }
-.player-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
+.card-header:hover{background:transparent}
+.card-header>div:first-child{flex:1;min-width:0}
+.card-header>div:last-child{
+  margin-left:auto;text-align:right;
 }
-.card-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  background: transparent;
-  padding: 0;
-  text-align: left;
+.card-title{font-size:16px;font-weight:700}
+.card-owned{font-size:25px;font-weight:700}
+.card-sub{font-size:12px;color:var(--muted)}
+.card-stats{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;margin:15px 0;
 }
-.card-header:hover { background: transparent; }
-.card-header > div:first-child { flex: 1; min-width: 0; }
-.card-header > div:last-child {
-  margin-left: auto;
-  text-align: right;
+.card-stat-label{font-size:11px;color:var(--muted)}
+.card-stat-value{font-size:17px;font-weight:650}
+.score-summary{
+  display:flex;justify-content:space-between;
+  gap:12px;align-items:center;
 }
-.card-title { font-size: 16px; font-weight: 700; }
-.card-owned { font-size: 25px; font-weight: 700; }
-.card-sub { font-size: 12px; color: var(--muted); }
-.card-stats {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 8px;
-  margin: 15px 0;
+.score-summary>div:last-child{
+  text-align:right;flex-shrink:0;
 }
-.card-stat-label { font-size: 11px; color: var(--muted); }
-.card-stat-value { font-size: 17px; font-weight: 650; }
-.score-summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
+.card-details{
+  margin-top:15px;padding-top:13px;
+  border-top:1px solid var(--border);
 }
-.score-summary > div:last-child {
-  text-align: right;
-  flex-shrink: 0;
-}
-.card-details {
-  margin-top: 15px;
-  padding-top: 13px;
-  border-top: 1px solid var(--border);
-}
-[hidden] { display: none!important; }
+[hidden]{display:none!important}
 
-@media(max-width:700px) {
-  body { padding: 15px 12px; }
-  .panel { padding: 14px; }
-  .account { display: block; }
-  .account button { width: 100%; margin-top: 10px; }
-  .table-wrap { display: none; }
-  #mobilePlayerCards { display: grid; gap: 11px; }
-  .search { width: 100%!important; }
-  .league-card > summary { padding: 13px; }
-  .suggestion-body { padding: 8px 13px 13px; }
-  .league-title { font-size: 15px; }
-  .league-metrics { gap: 5px; }
-  .metric strong { font-size: 12px; }
-  .metric span { font-size: 10px; }
-  .suggestion-totals span { font-size: 10px; }
-  .league-item {
-    grid-template-columns: minmax(0,1fr) 75px 45px;
-    font-size: 11px;
+@media(max-width:700px){
+  body{padding:15px 12px}
+  .panel{padding:14px}
+  .account{display:block}
+  .account button{width:100%;margin-top:10px}
+  .table-wrap{display:none}
+  #mobilePlayerCards{display:grid;gap:11px}
+  .search{width:100%!important}
+  .league-card>summary{padding:13px}
+  .suggestion-body{padding:8px 13px 13px}
+  .league-title{font-size:15px}
+  .league-metrics{gap:5px}
+  .metric strong{font-size:12px}
+  .metric span{font-size:10px}
+  .suggestion-totals span{font-size:10px}
+  .league-item{
+    grid-template-columns:minmax(0,1fr) 75px 45px;
+    font-size:11px;
   }
+  .portfolio-standing-row{
+    grid-template-columns:minmax(0,1fr) 40px 35px 50px;
+    column-gap:6px;
+  }
+  .portfolio-standing-name,.portfolio-standing-place{
+    font-size:12px;
+  }
+  .portfolio-standing-header{font-size:10px}
 }
-@media(prefers-reduced-motion:reduce) {
-  .section-chevron { transition: none; }
+@media(prefers-reduced-motion:reduce){
+  .section-chevron{transition:none}
 }
 </style>
 </head>
@@ -488,9 +343,7 @@ th { color: var(--muted); }
         placeholder="Enter Sleeper username"
         autocomplete="off">
     </div>
-    <button id="loadButton" type="button">
-      Load My Leagues
-    </button>
+    <button id="loadButton" type="button">Load My Leagues</button>
   </div>
   <p id="status" class="status" role="status">
     Enter a username and load leagues.
@@ -502,45 +355,46 @@ th { color: var(--muted); }
   <div class="mode-switch">
     <button id="modeCurrent" class="active"
       aria-pressed="true">Current Roster</button>
-    <button id="modeWeekly"
-      aria-pressed="false">Selected Week</button>
+    <button id="modeWeekly" aria-pressed="false">
+      Selected Week
+    </button>
   </div>
   <p id="modeNote" class="status">
     Latest roster assignments. Scores follow selected week.
   </p>
 </section>
 
-<section class="panel" aria-label="Portfolio totals">
-  <h2>Portfolio Summary</h2>
-  <div class="portfolio-row">
-    <span>Included leagues</span>
-    <span id="leagueCount">--</span>
+<details id="portfolioSection" class="dashboard-section">
+  <summary class="section-toggle">
+    <div>
+      <span class="section-title">Portfolio Summary</span>
+      <span id="portfolioRefreshTime" class="section-description">
+        Not loaded yet
+      </span>
+    </div>
+    <span class="section-chevron" aria-hidden="true">⌄</span>
+  </summary>
+  <div class="section-content">
+    <div class="panel">
+      <div class="portfolio-row">
+        <span>Included leagues</span>
+        <span id="leagueCount">--</span>
+      </div>
+      <div class="portfolio-row">
+        <span>Unique players</span>
+        <span id="uniqueCount">--</span>
+      </div>
+      <div id="portfolioStandings" class="portfolio-standings"></div>
+      <p class="status">
+        Chopped leagues are excluded from the ranked list only.
+        *Place is estimated from record and PF.
+        PF ranks points scored, highest first.
+        Reverse Max PF is shown for Dynasty leagues only
+        and ranks lowest Max PF first.
+      </p>
+    </div>
   </div>
-  <div class="portfolio-row">
-    <span>Roster spots</span>
-    <span id="playerCount">--</span>
-  </div>
-  <div class="portfolio-row">
-    <span>Unique players</span>
-    <span id="uniqueCount">--</span>
-  </div>
-  <div class="portfolio-row">
-    <span>Starting</span>
-    <span id="starterCount">--</span>
-  </div>
-  <div class="portfolio-row">
-    <span id="benchLabel">Bench</span>
-    <span id="benchCount">--</span>
-  </div>
-  <div class="portfolio-row">
-    <span>IR (current only)</span>
-    <span id="reserveCount">--</span>
-  </div>
-  <div class="portfolio-row">
-    <span>Taxi (current only)</span>
-    <span id="taxiCount">--</span>
-  </div>
-</section>
+</details>
 
 <section class="panel">
   <h2>League filters</h2>
@@ -571,9 +425,8 @@ th { color: var(--muted); }
 <section class="panel">
   <h2>Lineup Alerts</h2>
   <p class="status">
-    Red: Out, IR, Doubtful, confirmed Bye.
-    Orange: Questionable.
-    Injury designations reflect current data.
+    Red: Bye, Out, IR, Doubtful.
+    Orange: Questionable. Injury data reflects current status.
   </p>
 
   <div class="alert-box">
@@ -636,13 +489,11 @@ th { color: var(--muted); }
   <p id="scoreUpdated" class="status"></p>
 </section>
 
-<!-- Both large sections start collapsed -->
 <details id="suggestionsSection" class="dashboard-section">
   <summary class="section-toggle">
     <div>
       <span class="section-title">Lineup Suggestions</span>
-      <span id="suggestionsSectionSummary"
-        class="section-description">
+      <span id="suggestionsSectionSummary" class="section-description">
         Load leagues to see current-week suggestions.
       </span>
     </div>
@@ -650,8 +501,9 @@ th { color: var(--muted); }
   </summary>
   <div class="section-content">
     <p class="status">
-      Current NFL week · Minimum +2.5 PPR per
-      projected-points swap. Suggestions are advisory only.
+      Current NFL week · Minimum +2.5 PPR for ordinary
+      projected-points swaps. Confirmed bye replacements
+      require only a positive projection.
     </p>
     <p id="currentWeekStatus" class="status">
       Checking Sleeper's current NFL week...
@@ -668,8 +520,7 @@ th { color: var(--muted); }
   <summary class="section-toggle">
     <div>
       <span class="section-title">Player Exposure</span>
-      <span id="exposureSectionSummary"
-        class="section-description">
+      <span id="exposureSectionSummary" class="section-description">
         Load leagues to see player exposure.
       </span>
     </div>
@@ -696,17 +547,11 @@ th { color: var(--muted); }
       <table>
         <thead>
           <tr>
-            <th>Player</th>
-            <th>Position / Team</th>
-            <th>Rostered</th>
-            <th>Start</th>
-            <th id="benchHeading">Bench</th>
-            <th>IR</th>
-            <th>Taxi</th>
-            <th>Current injury</th>
-            <th>Opponent</th>
-            <th>Avg Pts</th>
-            <th>Game</th>
+            <th>Player</th><th>Position / Team</th>
+            <th>Rostered</th><th>Start</th>
+            <th id="benchHeading">Bench</th><th>IR</th><th>Taxi</th>
+            <th>Current injury</th><th>Opponent</th>
+            <th>Avg Pts</th><th>Game</th>
           </tr>
         </thead>
         <tbody id="playerTableBody"></tbody>
