@@ -734,6 +734,163 @@ th{color:var(--muted)}
 .ppr-chart-footer{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:600;margin:3px 0 5px}
 .ppr-low{color:var(--red)}.ppr-avg{color:var(--muted)}.ppr-high{color:var(--chart-color)}
 
+/* =========================================
+   v7.7.6 — Player Exposure Filters
+   ========================================= */
+
+.exposure-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+/* Four equal-width position filters */
+.position-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Two equal-width secondary filters */
+.exposure-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Shared filter tile */
+.exposure-filters .filter-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 5px;
+
+  border: 1px solid var(--tile-border);
+  border-radius: 10px;
+
+  background: var(--tile-bg);
+  color: var(--text);
+
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+
+  cursor: pointer;
+  user-select: none;
+
+  transition:
+    background-color .15s ease,
+    border-color .15s ease,
+    opacity .15s ease;
+}
+
+/* Checkbox styling */
+.exposure-filters .filter-tile input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+
+  accent-color: var(--tile-accent);
+  cursor: pointer;
+}
+
+.exposure-filters .filter-tile span {
+  min-width: 0;
+}
+
+/* QB — muted pink */
+.filter-qb {
+  --tile-bg: #29212b;
+  --tile-border: #69415a;
+  --tile-accent: #d68fb0;
+}
+
+/* RB — muted green */
+.filter-rb {
+  --tile-bg: #1d2926;
+  --tile-border: #345e50;
+  --tile-accent: #70bea1;
+}
+
+/* WR — muted blue */
+.filter-wr {
+  --tile-bg: #1c2733;
+  --tile-border: #355a78;
+  --tile-accent: #79b7dc;
+}
+
+/* TE — muted orange */
+.filter-te {
+  --tile-bg: #2b261e;
+  --tile-border: #725637;
+  --tile-accent: #d9a665;
+}
+
+/* Lineup Alerts — subtle red */
+.filter-alerts {
+  --tile-bg: #2b2025;
+  --tile-border: #77464d;
+  --tile-accent: #f08080;
+}
+
+/* Starters Only — subtle gold */
+.filter-starters {
+  --tile-bg: #2b271d;
+  --tile-border: #78633c;
+  --tile-accent: #f0c568;
+}
+
+/* Unselected tiles become quieter */
+.exposure-filters .filter-tile:has(input:not(:checked)) {
+  background: #1b2029;
+  border-color: #303642;
+  opacity: .72;
+}
+
+/* Selected tiles retain their position color */
+.exposure-filters .filter-tile:has(input:checked) {
+  opacity: 1;
+}
+
+/* Keyboard accessibility */
+.exposure-filters .filter-tile:focus-within {
+  outline: 2px solid var(--tile-accent);
+  outline-offset: 2px;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .position-filter-grid,
+  .exposure-secondary-grid {
+    gap: 7px;
+  }
+
+  .exposure-filters .filter-tile {
+    font-size: 12px;
+    padding: 8px 3px;
+    gap: 5px;
+  }
+
+  .exposure-filters .filter-tile input {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+/* Respect reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+  .exposure-filters .filter-tile {
+    transition: none;
+  }
+}
+
+
 </style>
 </head>
 <body>
@@ -1001,16 +1158,73 @@ th{color:var(--muted)}
         placeholder="Search players, positions or teams"
         aria-label="Search players">
     </div>
-    <div class="filters">
-      <label>
-        <input id="lineupAlertsOnly" type="checkbox">
-        Lineup Alerts Only
-      </label>
-      <label>
-        <input id="startersOnly" type="checkbox">
-        Starters Only
-      </label>
-    </div>
+
+<!-- v7.7.6 — Player Exposure Filters -->
+
+<div class="exposure-filters">
+
+  <!-- Position filters: all selected by default -->
+  <div class="position-filter-grid">
+
+    <label class="filter-tile filter-qb">
+      <input
+        type="checkbox"
+        class="position-filter"
+        value="QB"
+        checked>
+      <span>QB</span>
+    </label>
+
+    <label class="filter-tile filter-rb">
+      <input
+        type="checkbox"
+        class="position-filter"
+        value="RB"
+        checked>
+      <span>RB</span>
+    </label>
+
+    <label class="filter-tile filter-wr">
+      <input
+        type="checkbox"
+        class="position-filter"
+        value="WR"
+        checked>
+      <span>WR</span>
+    </label>
+
+    <label class="filter-tile filter-te">
+      <input
+        type="checkbox"
+        class="position-filter"
+        value="TE"
+        checked>
+      <span>TE</span>
+    </label>
+
+  </div>
+
+  <!-- Secondary filters -->
+  <div class="exposure-secondary-grid">
+
+    <label class="filter-tile filter-alerts">
+      <input
+        id="lineupAlertsOnly"
+        type="checkbox">
+      <span>Lineup Alerts Only</span>
+    </label>
+
+    <label class="filter-tile filter-starters">
+      <input
+        id="startersOnly"
+        type="checkbox">
+      <span>Starters Only</span>
+    </label>
+
+  </div>
+
+</div>
+
     <p id="playerStatus" class="status"></p>
     <div class="table-wrap">
       <table>
