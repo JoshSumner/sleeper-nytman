@@ -210,6 +210,36 @@ async function loadPlayerDatabase() {
   playerDatabase = data;
 }
 
+// v7.7.7 — Calculate player age to one decimal place
+function playerAge(player) {
+  const birthDate = player.birth_date;
+
+  if (birthDate) {
+    const birth = new Date(birthDate + "T00:00:00Z");
+
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date();
+
+      const age =
+        (now.getTime() - birth.getTime()) /
+        (365.2425 * 24 * 60 * 60 * 1000);
+
+      if (age >= 0 && age < 100) {
+        return age.toFixed(1);
+      }
+    }
+  }
+
+  // Fallback if Sleeper provides age but no birth date
+  const age = Number(player.age);
+
+  if (Number.isFinite(age) && age > 0 && age < 100) {
+    return age.toFixed(1);
+  }
+
+  return null;
+}
+
 function playerInfo(id) {
   const p = playerDatabase?.[String(id)] || {};
 
@@ -218,9 +248,12 @@ function playerInfo(id) {
     name:p.full_name ||
       [p.first_name,p.last_name].filter(Boolean).join(" ") ||
       `Player ${id}`,
-    position:p.position || "—",
-    team:normalizeTeam(p.team),
-    injury:p.injury_status || "—",
+    
+position:p.position || "—",
+team:normalizeTeam(p.team),
+age:playerAge(p),
+injury:p.injury_status || "—",
+
     eligible:Array.isArray(p.fantasy_positions)
       ? p.fantasy_positions.map(x =>
           String(x).toUpperCase())
@@ -1777,13 +1810,62 @@ function exposureData(items,mode=rosterMode) {
     }
   }
 
-  return {
-    totals,
-    players:[...exposure.values()].sort((a,b) =>
-      b.owned-a.owned ||
-      a.name.localeCompare(b.name)
-    )
-  };
+  
+// v7.7.7 — Rostership, position, position rank
+const positionOrder = {
+  QB: 0,
+  RB: 1,
+  WR: 2,
+  TE: 3,
+  K: 4,
+  DEF: 5,
+  DST: 5
+};
+
+const sortedPlayers = [...exposure.values()].sort(
+  (a, b) => {
+    // 1. Rostership: highest first
+    if (a.owned !== b.owned) {
+      return b.owned - a.owned;
+    }
+
+    // 2. Position: QB, RB, WR, TE, etc.
+    const aPosition = String(a.position).toUpperCase();
+    const bPosition = String(b.position).toUpperCase();
+
+    const aOrder = positionOrder[aPosition] ?? 99;
+    const bOrder = positionOrder[bPosition] ?? 99;
+
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
+    // 3. Season-to-date PPR position rank
+    const aRank = seasonPprRanks.get(a.id)?.value;
+    const bRank = seasonPprRanks.get(b.id)?.value;
+
+    const aValue = Number.isFinite(aRank)
+      ? aRank
+      : Infinity;
+
+    const bValue = Number.isFinite(bRank)
+      ? bRank
+      : Infinity;
+
+    if (aValue !== bValue) {
+      return aValue - bValue;
+    }
+
+    // 4. Alphabetical tiebreaker
+    return a.name.localeCompare(b.name);
+  }
+);
+
+return {
+  totals,
+  players: sortedPlayers
+};
+
 }
 
 // ----------------------------------
@@ -1975,12 +2057,68 @@ function renderSuggestions(items) {
     }
   }
 
-  cards.sort((a,b) =>
-    b.suggestions.length-a.suggestions.length ||
-    a.item.league.name.localeCompare(
-      b.item.league.name
-    )
+  
+// v7.7.8 — Prioritize actionable lineup suggestions
+
+function suggestionCount(card, type) {
+  return card.suggestions.filter(
+    suggestion => suggestion.type === type
+  ).length;
+}
+
+cards.sort((a, b) => {
+  // 1. Bye / Injury — highest first
+  const availabilityDifference =
+    suggestionCount(b, "availability") -
+    suggestionCount(a, "availability");
+
+  if (availabilityDifference !== 0) {
+    return availabilityDifference;
+  }
+
+  // 2. Flex changes — highest first
+  const flexDifference =
+    suggestionCount(b, "flex") -
+    suggestionCount(a, "flex");
+
+  if (flexDifference !== 0) {
+    return flexDifference;
+  }
+
+  // 3. Projected-points changes — highest first
+  const pointsDifference =
+    suggestionCount(b, "points") -
+    suggestionCount(a, "points");
+
+  if (pointsDifference !== 0) {
+    return pointsDifference;
+  }
+
+  // 4. Questionable — highest first
+  const questionableDifference =
+    suggestionCount(b, "questionable") -
+    suggestionCount(a, "questionable");
+
+  if (questionableDifference !== 0) {
+    return questionableDifference;
+  }
+
+  
+  // 5. Place — best-ranked teams first
+  const aPlace = leagueRanks(a.item).standing ?? Infinity;
+  const bPlace = leagueRanks(b.item).standing ?? Infinity;
+
+  if (aPlace !== bPlace) {
+    return aPlace - bPlace;
+  }
+
+  // 6. Alphabetical tiebreaker
+  return a.item.league.name.localeCompare(
+    b.item.league.name
   );
+
+});
+
 
   const total = cards.reduce(
     (sum,c) => sum+c.suggestions.length,0
@@ -2358,11 +2496,19 @@ const card = append(
       append(nameLine,"span",pprRank,"card-title player-position-rank");
     }
 
-    append(
-      left,"div",
-      `${p.position} · ${p.team}`,
-      "card-sub"
-    );
+    
+// v7.7.7 — Position, team, and age
+const playerDetails =
+  `${p.position} · ${p.team}` +
+  (p.age !== null ? ` · Age ${p.age}` : "");
+
+append(
+  left,
+  "div",
+  playerDetails,
+  "card-sub"
+);
+
 
     append(
       left,"div",
