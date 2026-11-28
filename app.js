@@ -7,16 +7,35 @@ const PROJ_API = "https://api.sleeper.com/projections/nfl";
 const ESPN_API =
   "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 const MIN_GAIN = 2.5;
-const USERNAME_STORAGE_KEY =
-  "sleeper_command_center_username";
+const USERNAME_KEY = "sleeper_command_center_username";
+
+// 2026 bye information supplied by the user.
+// Other weeks remain unverified.
+const VERIFIED_BYES = {
+  12: [],
+  13: ["BAL","IND","LV","NYJ"],
+  14: ["DAL","ARI"]
+};
+
+const NFL_TEAMS = new Set([
+  "ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE",
+  "DAL","DEN","DET","GB","HOU","IND","JAX","KC",
+  "LAC","LAR","LV","MIA","MIN","NE","NO","NYG",
+  "NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS"
+]);
+
+const STATUS_ORDER = {
+  Starting:0,Bench:1,"Not Starting":1,IR:2,Taxi:3
+};
 
 const $ = id => document.getElementById(id);
 
-function text(id, value) {
-  $(id).textContent = String(value);
+function text(id,value) {
+  const el = $(id);
+  if (el) el.textContent = String(value);
 }
 
-function append(parent, tag, value, className = "") {
+function append(parent,tag,value="",className="") {
   const el = document.createElement(tag);
   el.textContent = String(value);
   if (className) el.className = className;
@@ -28,6 +47,7 @@ let leagueData = [];
 let playerDatabase = null;
 let loadedUsername = "";
 let rosterMode = "current";
+let portfolioLastLoaded = null;
 
 let accountVersion = 0;
 let historyVersion = 0;
@@ -44,45 +64,35 @@ let currentProjections = new Map();
 let currentDataReady = false;
 let currentDataError = "";
 
-const NFL_TEAMS = new Set([
-  "ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE",
-  "DAL","DEN","DET","GB","HOU","IND","JAX","KC",
-  "LAC","LAR","LV","MIA","MIN","NE","NO","NYG",
-  "NYJ","PHI","PIT","SEA","SF","TB","TEN","WAS"
-]);
-
-const STATUS_ORDER = {
-  Starting:0, Bench:1, "Not Starting":1, IR:2, Taxi:3
-};
-
 function normalizeTeam(team) {
   const t = String(team || "").toUpperCase();
   return ({
-    WSH:"WAS", JAC:"JAX", LA:"LAR",
-    OAK:"LV", SD:"LAC", STL:"LAR"
+    WSH:"WAS",JAC:"JAX",LA:"LAR",
+    OAK:"LV",SD:"LAC",STL:"LAR"
   })[t] || t;
 }
 
 function formatPoints(value) {
-  if (value == null || !Number.isFinite(Number(value))) {
-    return "—";
-  }
-  return Number(value).toFixed(1);
+  return value == null || !Number.isFinite(Number(value))
+    ? "—" : Number(value).toFixed(1);
 }
 
 function ordinal(n) {
-  if (!n || n < 1) return "—";
-  const suffix = n % 100 >= 11 && n % 100 <= 13
-    ? "th"
-    : ({1:"st",2:"nd",3:"rd"})[n % 10] || "th";
+  if (!Number.isInteger(n) || n < 1) return "—";
+  const suffix = n%100 >= 11 && n%100 <= 13
+    ? "th" : ({1:"st",2:"nd",3:"rd"})[n%10] || "th";
   return `${n}${suffix}`;
 }
 
+function rankColor(rank) {
+  if (rank == null) return "";
+  return rank <= 5 ? "green" :
+    rank <= 8 ? "yellow" : "red";
+}
+
 async function getData(url) {
-  const response = await fetch(url, {cache:"no-store"});
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
+  const response = await fetch(url,{cache:"no-store"});
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
 
@@ -90,22 +100,20 @@ async function getData(url) {
 // USERNAME PERSISTENCE
 // ----------------------------------
 
-function saveSleeperUsername(username) {
+function saveUsername(username) {
   try {
-    localStorage.setItem(USERNAME_STORAGE_KEY, username);
+    localStorage.setItem(USERNAME_KEY,username);
   } catch(error) {
-    console.warn("Could not save username:", error);
+    console.warn("Username could not be saved",error);
   }
 }
 
-function restoreSleeperUsername() {
+function restoreUsername() {
   try {
-    const saved = localStorage.getItem(
-      USERNAME_STORAGE_KEY
-    );
+    const saved = localStorage.getItem(USERNAME_KEY);
     if (saved) $("sleeperUsername").value = saved;
   } catch(error) {
-    console.warn("Could not restore username:", error);
+    console.warn("Username could not be restored",error);
   }
 }
 
@@ -115,7 +123,6 @@ function restoreSleeperUsername() {
 
 function leagueType(league) {
   if (league.settings?.type == null) return "Other";
-
   return ({
     0:"Redraft",
     1:"Keeper",
@@ -134,11 +141,12 @@ function isEmptyLeague(rosters) {
   );
 }
 
+// Chopped leagues are INCLUDED here.
+// They are excluded only in renderPortfolioStandings().
 function selectedLeagues() {
   const types = new Set(
-    [...document.querySelectorAll(
-      "#baseFilters input:checked"
-    )].map(input => input.value)
+    [...document.querySelectorAll("#baseFilters input:checked")]
+      .map(el => el.value)
   );
 
   return leagueData.filter(item =>
@@ -151,17 +159,19 @@ function selectedLeagues() {
 }
 
 // ----------------------------------
-// PLAYER DIRECTORY
+// PLAYERS AND INJURIES
 // ----------------------------------
 
 async function loadPlayerDatabase() {
   if (playerDatabase) return;
 
   const data = await getData(`${API}/players/nfl`);
+
   if (!data || typeof data !== "object" ||
       Array.isArray(data)) {
     throw new Error("Invalid player directory");
   }
+
   playerDatabase = data;
 }
 
@@ -177,8 +187,8 @@ function playerInfo(id) {
     team:normalizeTeam(p.team),
     injury:p.injury_status || "—",
     eligible:Array.isArray(p.fantasy_positions)
-      ? p.fantasy_positions.map(String)
-      : p.position ? [p.position] : []
+      ? p.fantasy_positions.map(x => String(x).toUpperCase())
+      : p.position ? [String(p.position).toUpperCase()] : []
   };
 }
 
@@ -186,8 +196,7 @@ function injuryPriority(value) {
   const s = String(value || "").trim().toLowerCase();
 
   if ([
-    "out","o","ir","injured reserve",
-    "doubtful","d"
+    "out","o","ir","injured reserve","doubtful","d"
   ].includes(s)) return "high";
 
   if (["questionable","q"].includes(s)) {
@@ -198,9 +207,11 @@ function injuryPriority(value) {
 }
 
 function injuryClass(value) {
-  const p = injuryPriority(value);
-  if (p === "high") return "injury-out";
-  if (p === "questionable") return "injury-questionable";
+  const priority = injuryPriority(value);
+
+  if (priority === "high") return "injury-out";
+  if (priority === "questionable") return "injury-questionable";
+
   return value === "—" ? "injury-healthy" : "injury-other";
 }
 
@@ -215,60 +226,115 @@ function statusClass(status) {
 }
 
 // ----------------------------------
+// BYE-WEEK LOGIC
+// ----------------------------------
+
+function byeStatus(team,week) {
+  const code = normalizeTeam(team);
+
+  if (!NFL_TEAMS.has(code)) return "unknown";
+
+  if (!Object.prototype.hasOwnProperty.call(
+    VERIFIED_BYES,week
+  )) return "unknown";
+
+  return VERIFIED_BYES[week].includes(code)
+    ? "bye" : "not_bye";
+}
+
+function currentBye(id) {
+  if (currentNFLWeek == null) return "unknown";
+
+  return byeStatus(
+    playerInfo(id).team,
+    currentNFLWeek
+  );
+}
+
+function playerReasons(id) {
+  const info = playerInfo(id);
+  const reasons = [];
+
+  if (currentBye(id) === "bye") {
+    reasons.push("BYE WEEK");
+  }
+
+  const priority = injuryPriority(info.injury);
+
+  if (priority !== "none") {
+    reasons.push(String(info.injury).toUpperCase());
+  }
+
+  return reasons;
+}
+
+function playerAlertPriority(id) {
+  if (currentBye(id) === "bye") return "high";
+  return injuryPriority(playerInfo(id).injury);
+}
+
+// ----------------------------------
 // NFL SCHEDULE
 // ----------------------------------
 
 function parseSchedule(data) {
-  if (!Array.isArray(data.events) ||
-      !data.events.length) {
+  if (!Array.isArray(data.events) || !data.events.length) {
     throw new Error("No NFL games returned");
   }
 
   const games = new Map();
 
   for (const event of data.events) {
-    const competitors =
-      event.competitions?.[0]?.competitors || [];
-
-    const home = competitors.find(
-      t => t.homeAway === "home"
-    );
-    const away = competitors.find(
-      t => t.homeAway === "away"
-    );
+    const teams = event.competitions?.[0]?.competitors || [];
+    const home = teams.find(t => t.homeAway === "home");
+    const away = teams.find(t => t.homeAway === "away");
 
     const h = normalizeTeam(home?.team?.abbreviation);
     const a = normalizeTeam(away?.team?.abbreviation);
 
     if (!NFL_TEAMS.has(h) ||
-        !NFL_TEAMS.has(a) || h === a) continue;
+        !NFL_TEAMS.has(a) || h === a) {
+      continue;
+    }
 
     const status = event.status?.type;
+
     const state = status?.completed ? "Final" :
       status?.state === "in" ? "Live" :
       status?.state === "pre" ? "Scheduled" : "Unknown";
 
     games.set(h,{
-      home:true,opponent:a,date:event.date,state
+      home:true,
+      opponent:a,
+      date:event.date,
+      state
     });
+
     games.set(a,{
-      home:false,opponent:h,date:event.date,state
+      home:false,
+      opponent:h,
+      date:event.date,
+      state
     });
   }
 
-  if (!games.size) throw new Error("No valid NFL games");
+  if (!games.size) {
+    throw new Error("No valid NFL games");
+  }
+
   return games;
 }
 
 async function fetchSchedule(week) {
   const data = await getData(
-    `${ESPN_API}?dates=${SEASON}` +
-    `&seasontype=2&week=${week}&limit=100`
+    `${ESPN_API}?dates=${SEASON}&seasontype=2` +
+    `&week=${week}&limit=100`
   );
+
   return parseSchedule(data);
 }
 
-function scheduleInfo(team, schedule) {
+function scheduleInfo(team,schedule) {
   const game = schedule.get(normalizeTeam(team));
 
   if (!game) {
@@ -280,6 +346,7 @@ function scheduleInfo(team, schedule) {
   }
 
   const date = new Date(game.date);
+
   const time = Number.isNaN(date.getTime())
     ? "Time unavailable"
     : new Intl.DateTimeFormat(undefined,{
@@ -292,16 +359,17 @@ function scheduleInfo(team, schedule) {
 
   return {
     ...game,
-    text:`${game.home ? "vs" : "@"} ` +
-      `${game.opponent} · ${time}`
+    text:`${game.home ? "vs" : "@"} ${game.opponent} · ${time}`
   };
 }
 
-function shortTime(team, schedule) {
-  const game = scheduleInfo(team, schedule);
+function shortTime(team,schedule) {
+  const game = scheduleInfo(team,schedule);
+
   if (!game.date) return game.text;
 
   const date = new Date(game.date);
+
   if (Number.isNaN(date.getTime())) {
     return "Time unavailable";
   }
@@ -313,32 +381,41 @@ function shortTime(team, schedule) {
   }).format(date);
 }
 
-function timing(team, schedule) {
-  const game = scheduleInfo(team, schedule);
+function timing(team,schedule) {
+  const game = scheduleInfo(team,schedule);
   const kickoff = Date.parse(game.date || "");
 
-  if (!Number.isFinite(kickoff)) return "unknown";
+  if (!Number.isFinite(kickoff)) {
+    return "unknown";
+  }
 
   if (
     game.state === "Live" ||
     game.state === "Final" ||
     Date.now() >= kickoff
-  ) return "locked";
+  ) {
+    return "locked";
+  }
 
   return game.state === "Scheduled"
     ? "upcoming" : "unknown";
 }
 
-function gameInfo(team) {
-  return scheduleInfo(team, selectedSchedule);
+function currentTiming(id) {
+  if (currentBye(id) === "bye") return "bye";
+
+  return timing(
+    playerInfo(id).team,
+    currentSchedule
+  );
 }
 
-function shortGameTime(team) {
-  return shortTime(team, selectedSchedule);
+function gameInfo(team) {
+  return scheduleInfo(team,selectedSchedule);
 }
 
 // ----------------------------------
-// CURRENT NFL WEEK
+// CURRENT-WEEK DATA
 // ----------------------------------
 
 async function refreshCurrentWeek() {
@@ -350,11 +427,15 @@ async function refreshCurrentWeek() {
   currentProjections = new Map();
   currentDataError = "";
 
-  text("currentWeekStatus","Checking current NFL week...");
+  text("currentWeekStatus",
+    "Checking current NFL week..."
+  );
+
   renderDashboard();
 
   try {
     const state = await getData(`${API}/state/nfl`);
+
     if (request !== currentVersion) return;
 
     const week = Number(state.week);
@@ -376,8 +457,7 @@ async function refreshCurrentWeek() {
     const results = await Promise.allSettled([
       fetchSchedule(week),
       getData(
-        `${PROJ_API}/${SEASON}/${week}` +
-        "?season_type=regular"
+        `${PROJ_API}/${SEASON}/${week}?season_type=regular`
       )
     ]);
 
@@ -385,7 +465,7 @@ async function refreshCurrentWeek() {
 
     if (results.some(r => r.status !== "fulfilled")) {
       throw new Error(
-        "Current-week schedule or projections unavailable."
+        "Current schedule or projections unavailable."
       );
     }
 
@@ -393,7 +473,7 @@ async function refreshCurrentWeek() {
     const rows = results[1].value;
 
     if (!Array.isArray(rows)) {
-      throw new Error("Invalid projections");
+      throw new Error("Invalid projection response");
     }
 
     const next = new Map();
@@ -424,19 +504,29 @@ async function refreshCurrentWeek() {
     currentProjections = next;
     currentDataReady = true;
 
+    const byeTeams = VERIFIED_BYES[week];
+
+    const byeNote = byeTeams
+      ? `${byeTeams.length} configured bye teams`
+      : "Bye schedule unverified";
+
     text("currentWeekStatus",
-      `Current NFL week: ${week}.`
+      `Current NFL week: ${week} · ${byeNote}.`
     );
+
     text("projectionStatus",
       `${next.size} current-week PPR projections loaded.`
     );
 
   } catch(error) {
     if (request !== currentVersion) return;
+
     currentDataError = error.message;
+
     text("currentWeekStatus",
       `Current-week data unavailable: ${error.message}`
     );
+
     text("projectionStatus","Projections not ready.");
   }
 
@@ -450,7 +540,7 @@ function projectedPoints(id) {
 }
 
 // ----------------------------------
-// HISTORICAL WEEK SCHEDULE / SCORES
+// SELECTED-WEEK SCORES
 // ----------------------------------
 
 async function loadSelectedSchedule(version) {
@@ -459,20 +549,25 @@ async function loadSelectedSchedule(version) {
   selectedSchedule = new Map();
   selectedScheduleWeek = null;
 
-  text("scheduleStatus",`Loading Week ${week} schedule...`);
+  text("scheduleStatus",
+    `Loading Week ${week} schedule...`
+  );
 
   try {
     const games = await fetchSchedule(week);
+
     if (version !== historyVersion) return;
 
     selectedSchedule = games;
     selectedScheduleWeek = week;
 
     text("scheduleStatus",
-      `Week ${week}: ${games.size / 2} games loaded.`
+      `Week ${week}: ${games.size/2} games loaded.`
     );
+
   } catch(error) {
     if (version !== historyVersion) return;
+
     text("scheduleStatus",
       `Schedule unavailable: ${error.message}`
     );
@@ -491,15 +586,20 @@ function scoreForPlayer(leagueId,id) {
   }
 
   const scores = weeklyMatchup(leagueId)?.players_points;
-  if (!scores ||
-      !Object.prototype.hasOwnProperty.call(
-        scores,String(id)
-      )) return null;
+
+  if (
+    !scores ||
+    !Object.prototype.hasOwnProperty.call(
+      scores,String(id)
+    )
+  ) return null;
 
   const value = scores[String(id)];
+
   if (value == null || value === "") return null;
 
   const n = Number(value);
+
   return Number.isFinite(n) ? n : null;
 }
 
@@ -518,6 +618,7 @@ async function loadScores(version) {
 
   const account = accountVersion;
   const week = Number($("gameWeek").value);
+
   const items = leagueData.filter(
     x => !x.failed && x.myRoster
   );
@@ -526,15 +627,20 @@ async function loadScores(version) {
   scoreWeek = null;
 
   $("refreshScores").disabled = true;
-  text("scoreStatus",`Loading Week ${week} matchups...`);
-  text("scoreUpdated","Scores not yet refreshed.");
+
+  text("scoreStatus",
+    `Loading Week ${week} matchups...`
+  );
+
+  text("scoreUpdated",
+    "Scores not yet refreshed."
+  );
 
   try {
     const results = await Promise.allSettled(
       items.map(async item => {
         const rows = await getData(
-          `${API}/league/${item.league.league_id}` +
-          `/matchups/${week}`
+          `${API}/league/${item.league.league_id}/matchups/${week}`
         );
 
         if (!Array.isArray(rows)) {
@@ -554,7 +660,10 @@ async function loadScores(version) {
           throw new Error("Weekly roster unavailable");
         }
 
-        return [String(item.league.league_id),match];
+        return [
+          String(item.league.league_id),
+          match
+        ];
       })
     );
 
@@ -578,6 +687,7 @@ async function loadScores(version) {
       `Week ${week}: ${next.size} of ` +
       `${items.length} weekly rosters loaded.`
     );
+
     text("scoreUpdated",
       `Last refreshed: ${new Date().toLocaleString()}`
     );
@@ -608,16 +718,18 @@ function refreshHistoricalData() {
 // ----------------------------------
 
 function scoreSetting(settings,field) {
-  if (!settings || settings[field] == null) return null;
+  if (!settings || settings[field] == null) {
+    return null;
+  }
 
   const whole = Number(settings[field]);
   const decimal = Number(
-    settings[field + "_decimal"] || 0
+    settings[field+"_decimal"] || 0
   );
 
   return Number.isFinite(whole) &&
     Number.isFinite(decimal)
-    ? whole + decimal / 100
+    ? whole + decimal/100
     : null;
 }
 
@@ -645,6 +757,7 @@ function leagueRanks(item) {
 
     return 1 + rosters.filter(r => {
       const value = scoreSetting(r.settings,field);
+
       return ascending ? value < mine : value > mine;
     }).length;
   }
@@ -654,9 +767,10 @@ function leagueRanks(item) {
     const y = b.settings || {};
 
     const wx = Number(x.wins || 0) +
-      Number(x.ties || 0) / 2;
+      Number(x.ties || 0)/2;
+
     const wy = Number(y.wins || 0) +
-      Number(y.ties || 0) / 2;
+      Number(y.ties || 0)/2;
 
     return wy-wx ||
       (scoreSetting(y,"fpts") || 0) -
@@ -673,6 +787,101 @@ function leagueRanks(item) {
     pf:rank("fpts",false),
     maxPf:rank("ppts",true)
   };
+}
+
+// ----------------------------------
+// PORTFOLIO SUMMARY
+// ----------------------------------
+
+function updatePortfolioLoadedTime() {
+  text("portfolioRefreshTime",
+    portfolioLastLoaded
+      ? "Last loaded: " +
+        portfolioLastLoaded.toLocaleString(undefined,{
+          month:"short",
+          day:"numeric",
+          hour:"numeric",
+          minute:"2-digit"
+        })
+      : "Not loaded yet"
+  );
+}
+
+function renderPortfolioStandings(items) {
+  const container = $("portfolioStandings");
+  container.replaceChildren();
+
+  // Only the ranked list excludes Chopped leagues.
+  // They still contribute to totals and other sections.
+  const ranked = items
+    .filter(item =>
+      item.myRoster &&
+      leagueType(item.league) !== "Chopped"
+    )
+    .map(item => {
+      const ranks = leagueRanks(item);
+      const dynasty =
+        leagueType(item.league) === "Dynasty";
+
+      return {
+        name:item.league.name || "Unnamed league",
+        place:ranks.standing,
+        pf:ranks.pf,
+        maxPf:dynasty ? ranks.maxPf : null
+      };
+    })
+    .sort((a,b) =>
+      (a.place ?? Infinity) -
+        (b.place ?? Infinity) ||
+      (a.pf ?? Infinity) -
+        (b.pf ?? Infinity) ||
+      a.name.localeCompare(b.name)
+    );
+
+  const header = append(
+    container,"div","","portfolio-standing-row"
+  );
+
+  for (const label of [
+    "League","Place*","PF","Rev Max"
+  ]) {
+    append(
+      header,"span",label,
+      "portfolio-standing-header"
+    );
+  }
+
+  for (const league of ranked) {
+    const row = append(
+      container,"div","","portfolio-standing-row"
+    );
+
+    append(
+      row,"span",
+      league.name,
+      "portfolio-standing-name"
+    );
+
+    for (const rank of [
+      league.place,
+      league.pf,
+      league.maxPf
+    ]) {
+      append(
+        row,"span",
+        ordinal(rank),
+        `portfolio-standing-place ${rankColor(rank)}`
+      );
+    }
+  }
+
+  if (!ranked.length) {
+    append(
+      container,"p",
+      "No league standings available.",
+      "status"
+    );
+  }
 }
 
 // ----------------------------------
@@ -695,9 +904,7 @@ function displayPosition(slot) {
 }
 
 function eligibleFor(id,slot) {
-  const positions = playerInfo(id).eligible
-    .map(p => String(p).toUpperCase());
-
+  const positions = playerInfo(id).eligible;
   const s = String(slot).toUpperCase();
 
   if (!positions.length) return false;
@@ -721,14 +928,18 @@ function eligibleFor(id,slot) {
 function flexibleSlot(slot) {
   return [
     "FLEX","WRT",
-    "SUPER_FLEX","SUPERFLEX","WRTQ",
-    "REC_FLEX","WRRB_FLEX"
+    "SUPER_FLEX","SUPERFLEX",
+    "WRTQ","REC_FLEX","WRRB_FLEX"
   ].includes(String(slot).toUpperCase());
 }
 
 function lineupSlots(item) {
-  const positions = item.league.roster_positions || [];
-  const starters = item.myRoster?.starters || [];
+  const positions =
+    item.league.roster_positions || [];
+
+  const starters =
+    item.myRoster?.starters || [];
+
   const slots = [];
   let index = 0;
 
@@ -752,7 +963,7 @@ function lineupSlots(item) {
 }
 
 // ----------------------------------
-// COORDINATED LINEUP SUGGESTIONS
+// LINEUP OPTIMIZER
 // ----------------------------------
 
 function buildSuggestions(item) {
@@ -770,11 +981,14 @@ function buildSuggestions(item) {
   const suggestions = [];
 
   const active = new Set(
-    slots.map(s => s.id).filter(id => id && id !== "0")
+    slots.map(s => s.id)
+      .filter(id => id && id !== "0")
   );
+
   const reserve = new Set(
     (roster.reserve || []).map(String)
   );
+
   const taxi = new Set(
     (roster.taxi || []).map(String)
   );
@@ -792,24 +1006,21 @@ function buildSuggestions(item) {
   const usedBench = new Set();
   const coveredQuestionable = new Set();
 
-  function gameTiming(id) {
-    return timing(playerInfo(id).team,currentSchedule);
-  }
-
   function isQuestionable(id) {
-    return injuryPriority(playerInfo(id).injury) ===
-      "questionable";
+    return injuryPriority(
+      playerInfo(id).injury
+    ) === "questionable";
   }
 
-  function safePlayer(id) {
+  function safeBench(id) {
     const info = playerInfo(id);
 
     return NFL_TEAMS.has(info.team) &&
-      injuryPriority(info.injury) !== "high" &&
-      gameTiming(id) === "upcoming";
+      playerAlertPriority(id) !== "high" &&
+      currentTiming(id) === "upcoming";
   }
 
-  function add(type,title,detail,meta,ids = []) {
+  function add(type,title,detail,meta,ids=[],extra={}) {
     const questionableIds = [
       ...new Set(ids.filter(isQuestionable))
     ];
@@ -819,35 +1030,87 @@ function buildSuggestions(item) {
     }
 
     suggestions.push({
-      type,title,detail,meta,
+      type,
+      title,
+      detail,
+      meta,
       questionableIds,
       questionableNames:questionableIds.map(
         id => playerInfo(id).name
-      )
+      ),
+      ...extra
     });
   }
 
-  // Projected points: each swap >= 2.5 PPR.
+  // 1. BYE-WEEK REPLACEMENTS
+  // Positive projection required, no 2.5 PPR threshold.
+  for (const slot of slots) {
+    if (!slot.id || slot.id === "0") continue;
+    if (currentBye(slot.id) !== "bye") continue;
+
+    let best = null;
+
+    for (const id of bench) {
+      if (usedBench.has(id)) continue;
+      if (!safeBench(id)) continue;
+      if (!eligibleFor(id,slot.slot)) continue;
+
+      const pts = projectedPoints(id);
+
+      if (pts == null || pts <= 0) continue;
+
+      if (!best || pts > best.points) {
+        best = {id,points:pts};
+      }
+    }
+
+    if (!best) continue;
+
+    const outgoing = playerInfo(slot.id);
+    const incoming = playerInfo(best.id);
+
+    add(
+      "availability",
+      `${incoming.name} → ${displayPosition(slot.slot)}`,
+      `Replace ${outgoing.name} (BYE WEEK) ` +
+        `with ${incoming.name}.`,
+      `Projected ${formatPoints(best.points)} PPR · ` +
+        shortTime(incoming.team,currentSchedule),
+      [best.id,slot.id],
+      {reason:"BYE REPLACEMENT"}
+    );
+
+    usedBench.add(best.id);
+    changedSlots.add(slot.index);
+    slot.id = best.id;
+  }
+
+  // 2. ORDINARY PROJECTED-POINTS SWAPS
+  // Every swap must improve at least 2.5 PPR.
   while (true) {
     let best = null;
 
     for (const slot of slots) {
       if (!slot.id || slot.id === "0") continue;
       if (changedSlots.has(slot.index)) continue;
-      if (gameTiming(slot.id) !== "upcoming") continue;
+
+      if (currentTiming(slot.id) !== "upcoming") {
+        continue;
+      }
 
       const current = projectedPoints(slot.id);
       if (current == null) continue;
 
-      for (const candidateId of bench) {
-        if (usedBench.has(candidateId)) continue;
-        if (!safePlayer(candidateId)) continue;
-        if (!eligibleFor(candidateId,slot.slot)) continue;
+      for (const id of bench) {
+        if (usedBench.has(id)) continue;
+        if (!safeBench(id)) continue;
+        if (!eligibleFor(id,slot.slot)) continue;
 
-        const candidate = projectedPoints(candidateId);
+        const candidate = projectedPoints(id);
         if (candidate == null) continue;
 
         const gain = candidate-current;
+
         if (gain < MIN_GAIN) continue;
 
         if (
@@ -857,8 +1120,12 @@ function buildSuggestions(item) {
            slot.index < best.slot.index)
         ) {
           best = {
-            slot,candidateId,currentId:slot.id,
-            current,candidate,gain
+            slot,
+            candidateId:id,
+            currentId:slot.id,
+            current,
+            candidate,
+            gain
           };
         }
       }
@@ -877,15 +1144,15 @@ function buildSuggestions(item) {
       `${incoming.name} → ${displayPosition(best.slot.slot)}`,
       `Start ${incoming.name}; bench ${outgoing.name}.`,
       `${formatPoints(best.candidate)} vs ` +
-      `${formatPoints(best.current)} PPR · ` +
-      `+${formatPoints(best.gain)}`,
+        `${formatPoints(best.current)} PPR · ` +
+        `+${formatPoints(best.gain)}`,
       [best.candidateId,best.currentId]
     );
 
     best.slot.id = best.candidateId;
   }
 
-  // FLEX and SUPER FLEX kickoff optimization.
+  // 3. FLEX / SUPER FLEX KICKOFF OPTIMIZATION
   const usedFlexSlots = new Set();
 
   for (const flex of slots) {
@@ -897,9 +1164,13 @@ function buildSuggestions(item) {
       usedFlexSlots.has(flex.index)
     ) continue;
 
-    if (!safePlayer(flex.id)) continue;
+    if (
+      currentTiming(flex.id) !== "upcoming" ||
+      playerAlertPriority(flex.id) === "high"
+    ) continue;
 
     const flexPlayer = playerInfo(flex.id);
+
     const flexTime = Date.parse(
       scheduleInfo(
         flexPlayer.team,currentSchedule
@@ -919,7 +1190,10 @@ function buildSuggestions(item) {
         usedFlexSlots.has(fixed.index)
       ) continue;
 
-      if (!safePlayer(fixed.id)) continue;
+      if (
+        currentTiming(fixed.id) !== "upcoming" ||
+        playerAlertPriority(fixed.id) === "high"
+      ) continue;
 
       if (
         !eligibleFor(fixed.id,flex.slot) ||
@@ -927,6 +1201,7 @@ function buildSuggestions(item) {
       ) continue;
 
       const fixedPlayer = playerInfo(fixed.id);
+
       const fixedTime = Date.parse(
         scheduleInfo(
           fixedPlayer.team,currentSchedule
@@ -936,10 +1211,15 @@ function buildSuggestions(item) {
       if (!Number.isFinite(fixedTime)) continue;
 
       const difference = fixedTime-flexTime;
+
       if (difference <= 0) continue;
 
       if (!best || difference > best.difference) {
-        best = {fixed,fixedPlayer,difference};
+        best = {
+          fixed,
+          fixedPlayer,
+          difference
+        };
       }
     }
 
@@ -951,10 +1231,10 @@ function buildSuggestions(item) {
     add(
       "flex",
       `${later.name} → ${displayPosition(flex.slot)}`,
-      `Swap with ${earlier.name} ` +
-      `in ${displayPosition(best.fixed.slot)}.`,
+      `Swap with ${earlier.name} in ` +
+        `${displayPosition(best.fixed.slot)}.`,
       `${shortTime(earlier.team,currentSchedule)}` +
-      ` → ${shortTime(later.team,currentSchedule)}`,
+        ` → ${shortTime(later.team,currentSchedule)}`,
       [flex.id,best.fixed.id]
     );
 
@@ -966,39 +1246,46 @@ function buildSuggestions(item) {
     best.fixed.id = oldId;
   }
 
-  // Standalone warnings use original starters.
+  // 4. STANDALONE AVAILABILITY WARNINGS
+  // Original starters remain visible even if a
+  // replacement recommendation was generated.
   for (const slot of originalSlots) {
     if (!slot.id || slot.id === "0") continue;
 
     const info = playerInfo(slot.id);
-    const priority = injuryPriority(info.injury);
+    const priority = playerAlertPriority(slot.id);
+    const gameState = currentTiming(slot.id);
 
-    if (gameTiming(slot.id) !== "upcoming") continue;
+    if (priority === "none") continue;
+
+    if (
+      gameState === "locked" ||
+      gameState === "unknown"
+    ) continue;
 
     if (priority === "high") {
-      suggestions.push({
-        type:"availability",
-        title:info.name,
-        detail:
-          `${String(info.injury).toUpperCase()} · ` +
+      const reasons = playerReasons(slot.id);
+
+      add(
+        "availability",
+        info.name,
+        `${reasons.join(" + ")} · ` +
           displayPosition(slot.slot),
-        meta:shortTime(info.team,currentSchedule),
-        questionableIds:[],
-        questionableNames:[]
-      });
+        gameState === "bye"
+          ? "No game this week"
+          : shortTime(info.team,currentSchedule)
+      );
+
     } else if (
       priority === "questionable" &&
       !coveredQuestionable.has(slot.id)
     ) {
-      suggestions.push({
-        type:"questionable",
-        title:info.name,
-        detail:
-          `QUESTIONABLE · ${displayPosition(slot.slot)}`,
-        meta:shortTime(info.team,currentSchedule),
-        questionableIds:[],
-        questionableNames:[]
-      });
+      add(
+        "questionable",
+        info.name,
+        `QUESTIONABLE · ${displayPosition(slot.slot)}`,
+        shortTime(info.team,currentSchedule)
+      );
     }
   }
 
@@ -1013,24 +1300,37 @@ function resetDashboard() {
   leagueData = [];
   weeklyData = new Map();
   scoreWeek = null;
+  portfolioLastLoaded = null;
 
   for (const id of [
-    "leagueCount","playerCount","uniqueCount",
-    "starterCount","benchCount","reserveCount",
-    "taxiCount","highPriorityCount",
-    "highPriorityPlayers","questionableCount",
+    "leagueCount",
+    "uniqueCount",
+    "highPriorityCount",
+    "highPriorityPlayers",
+    "questionableCount",
     "questionablePlayers"
-  ]) text(id,"--");
+  ]) {
+    text(id,"--");
+  }
 
   for (const id of [
-    "playerTableBody","mobilePlayerCards",
-    "highPriorityList","lockedList",
-    "unverifiedList","suggestionsList"
-  ]) $(id).replaceChildren();
+    "portfolioStandings",
+    "playerTableBody",
+    "mobilePlayerCards",
+    "highPriorityList",
+    "lockedList",
+    "unverifiedList",
+    "suggestionsList"
+  ]) {
+    $(id).replaceChildren();
+  }
+
+  updatePortfolioLoadedTime();
 
   text("suggestionsSectionSummary",
     "Load leagues to see current-week suggestions."
   );
+
   text("exposureSectionSummary",
     "Load leagues to see player exposure."
   );
@@ -1046,6 +1346,7 @@ async function loadLeagues() {
 
   const request = ++accountVersion;
   ++historyVersion;
+
   loadedUsername = "";
   resetDashboard();
 
@@ -1059,21 +1360,26 @@ async function loadLeagues() {
     );
 
     if (request !== accountVersion) return;
+
     if (!user?.user_id) {
       throw new Error("Sleeper username not found");
     }
 
     const userId = String(user.user_id);
+
     const leagues = await getData(
       `${API}/user/${userId}/leagues/nfl/${SEASON}`
     );
 
     if (request !== accountVersion) return;
+
     if (!Array.isArray(leagues)) {
       throw new Error("Invalid league response");
     }
 
-    text("status",`Loading ${leagues.length} rosters...`);
+    text("status",
+      `Loading ${leagues.length} rosters...`
+    );
 
     const results = await Promise.allSettled(
       leagues.map(async league => {
@@ -1106,11 +1412,17 @@ async function loadLeagues() {
     leagueData = results.map((result,i) =>
       result.status === "fulfilled"
         ? result.value
-        : {league:leagues[i],failed:true}
+        : {
+            league:leagues[i],
+            failed:true
+          }
     );
 
     loadedUsername = username;
-    saveSleeperUsername(username);
+    saveUsername(username);
+
+    portfolioLastLoaded = new Date();
+    updatePortfolioLoadedTime();
 
     const failed = leagueData.filter(
       x => x.failed
@@ -1118,16 +1430,19 @@ async function loadLeagues() {
 
     text("status",
       `Loaded ${leagues.length-failed} of ` +
-      `${leagues.length} leagues for ${username}.`
+        `${leagues.length} leagues for ${username}.`
     );
 
     renderDashboard();
 
     try {
       await loadPlayerDatabase();
+
       if (request !== accountVersion) return;
+
     } catch(error) {
       console.warn("Player directory:",error);
+
       text("status",
         "Leagues loaded, but player directory unavailable."
       );
@@ -1144,7 +1459,9 @@ async function loadLeagues() {
 
     loadedUsername = "";
     resetDashboard();
+
     text("status",`Error: ${error.message}`);
+
   } finally {
     if (request === accountVersion) {
       $("loadButton").disabled = false;
@@ -1157,11 +1474,17 @@ async function loadLeagues() {
 // PLAYER EXPOSURE
 // ----------------------------------
 
-function exposureData(items) {
+function exposureData(items,mode=rosterMode) {
   const exposure = new Map();
+
   const totals = {
-    spots:0,starting:0,bench:0,
-    ir:0,taxi:0,included:0,missing:0
+    spots:0,
+    starting:0,
+    bench:0,
+    ir:0,
+    taxi:0,
+    included:0,
+    missing:0
   };
 
   for (const item of items) {
@@ -1174,7 +1497,7 @@ function exposureData(items) {
     const match = weeklyMatchup(leagueId);
 
     if (
-      rosterMode === "weekly" &&
+      mode === "weekly" &&
       (
         scoreWeek !== Number($("gameWeek").value) ||
         !match
@@ -1185,19 +1508,23 @@ function exposureData(items) {
     }
 
     const roster = item.myRoster;
-    const players = rosterMode === "weekly"
-      ? match.players.map(String)
+
+    const players = mode === "weekly"
+      ? (match.players || []).map(String)
       : (roster.players || []).map(String);
 
     const starters = new Set(
-      (rosterMode === "weekly"
-        ? match.starters
-        : roster.starters || []).map(String)
+      (
+        mode === "weekly"
+          ? match.starters
+          : roster.starters || []
+      ).map(String)
     );
 
     const ir = new Set(
       (roster.reserve || []).map(String)
     );
+
     const taxi = new Set(
       (roster.taxi || []).map(String)
     );
@@ -1207,10 +1534,15 @@ function exposureData(items) {
     for (const id of new Set(players)) {
       if (!id || id === "0") continue;
 
-      const status = starters.has(id) ? "Starting" :
-        rosterMode === "weekly" ? "Not Starting" :
-        ir.has(id) ? "IR" :
-        taxi.has(id) ? "Taxi" : "Bench";
+      const status = starters.has(id)
+        ? "Starting"
+        : mode === "weekly"
+        ? "Not Starting"
+        : ir.has(id)
+        ? "IR"
+        : taxi.has(id)
+        ? "Taxi"
+        : "Bench";
 
       if (!exposure.has(id)) {
         exposure.set(id,{
@@ -1242,6 +1574,7 @@ function exposureData(items) {
       }
 
       totals.spots++;
+
       p.leagues.push({
         id:leagueId,
         name:item.league.name || "Unnamed league",
@@ -1260,11 +1593,9 @@ function exposureData(items) {
 }
 
 // ----------------------------------
-// CURRENT-WEEK LINEUP ALERTS
+// HIGH-PRIORITY LINEUP ALERTS
 // ----------------------------------
 
-// Build alerts from actual starting assignments
-// in each selected league, not aggregated exposure.
 function collectLineupAlerts(items) {
   const groups = {
     high:new Map(),
@@ -1279,7 +1610,8 @@ function collectLineupAlerts(items) {
     if (!item.myRoster) continue;
 
     const leagueId = String(item.league.league_id);
-    const leagueName = item.league.name || "Unnamed league";
+    const leagueName =
+      item.league.name || "Unnamed league";
 
     const starters = new Set(
       (item.myRoster.starters || [])
@@ -1289,17 +1621,17 @@ function collectLineupAlerts(items) {
 
     for (const id of starters) {
       const info = playerInfo(id);
-      const priority = injuryPriority(info.injury);
+      const priority = playerAlertPriority(id);
 
       if (priority === "none") continue;
 
-      const gameState = currentDataReady
-        ? timing(info.team,currentSchedule)
+      const state = currentDataReady
+        ? currentTiming(id)
         : "unknown";
 
       const category =
-        gameState === "locked" ? "locked" :
-        gameState === "unknown" ? "unverified" :
+        state === "locked" ? "locked" :
+        state === "unknown" ? "unverified" :
         priority === "high" ? "high" :
         "questionable";
 
@@ -1309,11 +1641,13 @@ function collectLineupAlerts(items) {
         map.set(id,{
           ...info,
           priority,
-          reasons:[String(info.injury).toUpperCase()],
+          reasons:playerReasons(id),
           leagues:[],
-          gameTime:currentDataReady
-            ? shortTime(info.team,currentSchedule)
-            : "Schedule unavailable"
+          gameTime:state === "bye"
+            ? "No game this week"
+            : currentDataReady
+              ? shortTime(info.team,currentSchedule)
+              : "Schedule unavailable"
         });
       }
 
@@ -1327,12 +1661,13 @@ function collectLineupAlerts(items) {
   return groups;
 }
 
-function renderAlertRows(container, players) {
+function renderAlertRows(container,players) {
   container.replaceChildren();
 
   if (!players.length) {
     append(
-      container,"p","No matching alerts.","status"
+      container,"p",
+      "No matching alerts.","status"
     );
     return;
   }
@@ -1352,25 +1687,22 @@ function renderAlertRows(container, players) {
 
     append(top,"strong",p.name);
 
-    const tags = append(top,"div","","tags");
+    const tags = append(
+      top,"div","","tags"
+    );
 
     for (const reason of p.reasons) {
       append(
         tags,"span",reason,
-        "tag " + (
-          reason === "QUESTIONABLE"
-            ? "orange"
-            : "red"
-        )
+        `tag ${reason === "QUESTIONABLE" ? "orange" : "red"}`
       );
     }
 
     append(
-      row,
-      "div",
+      row,"div",
       `${leagues.length} starting ` +
-      `${leagues.length === 1 ? "lineup" : "lineups"}` +
-      ` · ${p.gameTime}`,
+        `${leagues.length === 1 ? "lineup" : "lineups"}` +
+        ` · ${p.gameTime}`,
       "status"
     );
 
@@ -1386,6 +1718,7 @@ function renderAlertRows(container, players) {
       append(
         line,"span","•","alert-league-bullet"
       );
+
       append(line,"span",league.name);
     }
   }
@@ -1410,6 +1743,7 @@ function renderSuggestions(items) {
     text("suggestionStatus",
       "Switch to Current Roster for suggestions."
     );
+
     text("suggestionsSectionSummary",
       "Current-week suggestions · Current Roster required"
     );
@@ -1421,6 +1755,7 @@ function renderSuggestions(items) {
       currentDataError ||
       "Waiting for player and week data."
     );
+
     text("suggestionsSectionSummary",
       "Current-week suggestions unavailable"
     );
@@ -1430,17 +1765,21 @@ function renderSuggestions(items) {
   const cards = [];
 
   for (const item of items) {
-    if (!item.myRoster ||
-        isBestBall(item.league)) continue;
+    if (
+      !item.myRoster ||
+      isBestBall(item.league)
+    ) continue;
 
     const suggestions = buildSuggestions(item);
+
     if (suggestions.length) {
       cards.push({item,suggestions});
     }
   }
 
   cards.sort((a,b) =>
-    b.suggestions.length-a.suggestions.length ||
+    b.suggestions.length -
+      a.suggestions.length ||
     a.item.league.name.localeCompare(
       b.item.league.name
     )
@@ -1452,15 +1791,18 @@ function renderSuggestions(items) {
 
   text("suggestionsSectionSummary",
     `Week ${currentNFLWeek} · ` +
-    `${cards.length} leagues · ${total} suggestions`
+      `${cards.length} leagues · ` +
+      `${total} suggestions`
   );
+
   text("suggestionStatus",
-    `${cards.length} leagues with ${total} suggestions. ` +
-    "Best Ball excluded."
+    `${cards.length} leagues with ` +
+      `${total} suggestions. Best Ball excluded.`
   );
 
   if (!cards.length) {
-    append(container,"p",
+    append(
+      container,"p",
       "No eligible lineup suggestions found.",
       "status"
     );
@@ -1469,6 +1811,11 @@ function renderSuggestions(items) {
 
   for (const {item,suggestions} of cards) {
     const ranks = leagueRanks(item);
+
+    // Reverse Max PF is only meaningful in the
+    // dashboard for Dynasty leagues.
+    const dynasty =
+      leagueType(item.league) === "Dynasty";
 
     const counts = {
       availability:suggestions.filter(
@@ -1489,16 +1836,21 @@ function renderSuggestions(items) {
     card.className = "league-card";
     card.dataset.leagueId =
       String(item.league.league_id);
+
     card.open = expanded.has(card.dataset.leagueId);
 
     const header = document.createElement("summary");
+
     const heading = append(
       header,"div","","league-heading"
     );
 
     const left = append(heading,"div","");
-    append(left,"div",
-      item.league.name,"league-title"
+
+    append(
+      left,"div",
+      item.league.name,
+      "league-title"
     );
 
     const right = append(
@@ -1512,16 +1864,24 @@ function renderSuggestions(items) {
       header,"div","","league-metrics"
     );
 
-    for (const [label,value] of [
-      ["Record",ranks.record],
-      ["Place*",ordinal(ranks.standing)],
-      ["PF",ordinal(ranks.pf)],
-      ["Reverse Max PF",ordinal(ranks.maxPf)]
+    for (const [label,value,rank] of [
+      ["Record",ranks.record,null],
+      ["Place*",ordinal(ranks.standing),ranks.standing],
+      ["PF",ordinal(ranks.pf),ranks.pf],
+      [
+        "Reverse Max PF",
+        dynasty ? ordinal(ranks.maxPf) : "—",
+        dynasty ? ranks.maxPf : null
+      ]
     ]) {
       const metric = append(
         metrics,"div","","metric"
       );
-      append(metric,"strong",value);
+
+      append(
+        metric,"strong",value,rankColor(rank)
+      );
+
       append(metric,"span",label);
     }
 
@@ -1536,6 +1896,7 @@ function renderSuggestions(items) {
       ["Projected Pts",counts.points,"yellow"]
     ]) {
       const box = append(summary,"div","");
+
       append(box,"span",label);
       append(box,"strong",value,color);
     }
@@ -1550,23 +1911,30 @@ function renderSuggestions(items) {
       const row = append(
         body,"div","","suggestion"
       );
+
       const head = append(
         row,"div","","suggestion-head"
       );
 
       append(
         head,"span",
-        suggestion.title,"suggestion-name"
+        suggestion.title,
+        "suggestion-name"
       );
 
-      const badge = {
-        availability:["ALERT","red"],
-        questionable:["QUESTIONABLE","orange"],
-        flex:["FLEX","yellow"],
-        points:["POINTS","yellow"]
-      }[suggestion.type];
+      const badge =
+        suggestion.reason === "BYE REPLACEMENT"
+          ? ["REPLACE","red"]
+          : ({
+              availability:["ALERT","red"],
+              questionable:["QUESTIONABLE","orange"],
+              flex:["FLEX","yellow"],
+              points:["POINTS","yellow"]
+            })[suggestion.type];
 
-      const badges = append(head,"div","","tags");
+      const badges = append(
+        head,"div","","tags"
+      );
 
       append(
         badges,"span",badge[0],
@@ -1581,11 +1949,14 @@ function renderSuggestions(items) {
 
       append(
         row,"div",
-        suggestion.detail,"suggestion-meta"
+        suggestion.detail,
+        "suggestion-meta"
       );
+
       append(
         row,"div",
-        suggestion.meta,"suggestion-note"
+        suggestion.meta,
+        "suggestion-note"
       );
 
       if (
@@ -1595,8 +1966,8 @@ function renderSuggestions(items) {
         append(
           row,"div",
           `Questionable: ` +
-          suggestion.questionableNames.join(", ") +
-          " — monitor availability before kickoff.",
+            suggestion.questionableNames.join(", ") +
+            " — monitor availability before kickoff.",
           "suggestion-note orange"
         );
       }
@@ -1641,7 +2012,7 @@ function renderPlayerList(players) {
 
     const sorted = [...p.leagues].sort((a,b) =>
       (STATUS_ORDER[a.status] ?? 9) -
-      (STATUS_ORDER[b.status] ?? 9) ||
+        (STATUS_ORDER[b.status] ?? 9) ||
       a.name.localeCompare(b.name)
     );
 
@@ -1656,9 +2027,13 @@ function renderPlayerList(players) {
         );
 
         append(line,"span",league.name);
-        append(line,"span",league.status,
+
+        append(
+          line,"span",
+          league.status,
           statusClass(league.status)
         );
+
         append(
           line,"span",
           formatPoints(
@@ -1675,17 +2050,21 @@ function renderPlayerList(players) {
 
     const toggle = append(
       nameCell,"button",
-      `▸ ${p.name}`,"player-button"
+      `▸ ${p.name}`,
+      "player-button"
     );
 
     toggle.type = "button";
     toggle.dataset.playerId = p.id;
 
-    const desktopOpen = expandedDesktop.has(p.id);
+    const desktopOpen =
+      expandedDesktop.has(p.id);
 
     toggle.setAttribute(
-      "aria-expanded",String(desktopOpen)
+      "aria-expanded",
+      String(desktopOpen)
     );
+
     toggle.textContent =
       `${desktopOpen ? "▾" : "▸"} ${p.name}`;
 
@@ -1693,12 +2072,21 @@ function renderPlayerList(players) {
 
     for (const value of [
       `${p.position} · ${p.team}`,
-      p.owned,p.starting,p.bench,
+      p.owned,
+      p.starting,
+      p.bench,
       rosterMode === "weekly" ? "—" : p.reserve,
       rosterMode === "weekly" ? "—" : p.taxi
-    ]) append(row,"td",value);
+    ]) {
+      append(row,"td",value);
+    }
 
-    append(row,"td",p.injury,injuryClass(p.injury));
+    append(
+      row,"td",
+      p.injury,
+      injuryClass(p.injury)
+    );
+
     append(row,"td",game.text);
     append(row,"td",formatPoints(avg));
     append(row,"td",game.state);
@@ -1711,16 +2099,20 @@ function renderPlayerList(players) {
 
     const cell = document.createElement("td");
     cell.colSpan = 11;
+
     addLeagueDetails(cell);
     details.appendChild(cell);
     tbody.appendChild(details);
 
     toggle.addEventListener("click",() => {
       details.hidden = !details.hidden;
+
       toggle.textContent =
         `${details.hidden ? "▸" : "▾"} ${p.name}`;
+
       toggle.setAttribute(
-        "aria-expanded",String(!details.hidden)
+        "aria-expanded",
+        String(!details.hidden)
       );
     });
 
@@ -1737,15 +2129,22 @@ function renderPlayerList(players) {
     header.dataset.playerId = p.id;
 
     const mobileOpen = expandedMobile.has(p.id);
+
     header.setAttribute(
-      "aria-expanded",String(mobileOpen)
+      "aria-expanded",
+      String(mobileOpen)
     );
 
     const left = append(header,"div","");
+
     append(left,"div",p.name,"card-title");
-    append(left,"div",
-      `${p.position} · ${p.team}`,"card-sub"
+
+    append(
+      left,"div",
+      `${p.position} · ${p.team}`,
+      "card-sub"
     );
+
     append(
       left,"div",
       p.injury === "—"
@@ -1755,18 +2154,24 @@ function renderPlayerList(players) {
     );
 
     const right = append(header,"div","");
-    append(right,"div",p.owned,"card-owned");
+
+    append(
+      right,"div",
+      p.owned,
+      "card-owned"
+    );
 
     if (injuryPriority(p.injury) !== "none") {
-      const tags = append(card,"div","","tags");
+      const tags = append(
+        card,"div","","tags"
+      );
 
       append(
         tags,"span",
         String(p.injury).toUpperCase(),
-        "tag " + (
-          injuryPriority(p.injury) === "questionable"
-            ? "orange" : "red"
-        )
+        "tag " +
+          (injuryPriority(p.injury) === "questionable"
+            ? "orange" : "red")
       );
     }
 
@@ -1790,9 +2195,12 @@ function renderPlayerList(players) {
 
     for (const [label,value,color] of statItems) {
       const stat = append(stats,"div","");
+
       append(
-        stat,"div",label,"card-stat-label"
+        stat,"div",label,
+        "card-stat-label"
       );
+
       append(
         stat,"div",value,
         `card-stat-value ${color}`
@@ -1804,10 +2212,12 @@ function renderPlayerList(players) {
     );
 
     const gameArea = append(score,"div","");
+
     append(gameArea,"div",game.text);
     append(gameArea,"div",game.state,"card-sub");
 
     const scoreArea = append(score,"div","");
+
     append(scoreArea,"div","Avg Pts","card-sub");
     append(scoreArea,"strong",formatPoints(avg));
 
@@ -1820,6 +2230,7 @@ function renderPlayerList(players) {
 
     header.addEventListener("click",() => {
       mobileDetails.hidden = !mobileDetails.hidden;
+
       header.setAttribute(
         "aria-expanded",
         String(!mobileDetails.hidden)
@@ -1829,41 +2240,38 @@ function renderPlayerList(players) {
 }
 
 // ----------------------------------
-// RENDER DASHBOARD
+// DASHBOARD RENDER
 // ----------------------------------
 
 function renderDashboard() {
   if (!loadedUsername) return;
 
+  // Includes Chopped leagues when the Chopped
+  // filter is checked.
   const items = selectedLeagues();
+
   const {totals,players} = exposureData(items);
 
-  const values = {
-    leagueCount:rosterMode === "weekly"
-      ? totals.included : items.length,
-    playerCount:totals.spots,
-    uniqueCount:players.length,
-    starterCount:totals.starting,
-    benchCount:totals.bench,
-    reserveCount:totals.ir,
-    taxiCount:totals.taxi
-  };
+  const currentExposure = rosterMode === "current"
+    ? {players}
+    : exposureData(items,"current");
 
-  for (const [id,value] of Object.entries(values)) {
-    text(id,value);
-  }
+  text("leagueCount",items.length);
 
-  if (rosterMode === "weekly") {
-    text("reserveCount","—");
-    text("taxiCount","—");
-  }
+  text(
+    "uniqueCount",
+    currentExposure.players.length
+  );
+
+  // Only this renderer removes Chopped leagues
+  // from its ranked list.
+  renderPortfolioStandings(items);
 
   text("emptyLeagueStatus",
     `${leagueData.filter(x => x.empty).length} empty leagues. ` +
-    `${totals.missing} selected rosters unavailable.`
+      `${totals.missing} selected rosters unavailable.`
   );
 
-  // Current-week lineup alerts, grouped by player.
   const groups = collectLineupAlerts(items);
 
   const sort = (a,b) =>
@@ -1871,45 +2279,71 @@ function renderDashboard() {
     a.name.localeCompare(b.name);
 
   const high = [...groups.high.values()].sort(sort);
+
   const questionable =
     [...groups.questionable.values()].sort(sort);
-  const locked = [...groups.locked.values()].sort(sort);
+
+  const locked =
+    [...groups.locked.values()].sort(sort);
+
   const unverified =
     [...groups.unverified.values()].sort(sort);
 
   const count = list =>
-    list.reduce((sum,p) => sum+p.leagues.length,0);
+    list.reduce(
+      (sum,p) => sum+p.leagues.length,0
+    );
 
-  const ready = !!playerDatabase && currentDataReady;
+  const ready =
+    !!playerDatabase && currentDataReady;
 
-  text("highPriorityCount",
+  text(
+    "highPriorityCount",
     ready ? count(high) : "—"
   );
-  text("highPriorityPlayers",
+
+  text(
+    "highPriorityPlayers",
     ready ? high.length : "—"
   );
-  text("questionableCount",
+
+  text(
+    "questionableCount",
     ready ? count(questionable) : "—"
   );
-  text("questionablePlayers",
+
+  text(
+    "questionablePlayers",
     ready ? questionable.length : "—"
   );
 
-  renderAlertRows($("highPriorityList"),high);
-  renderAlertRows($("lockedList"),locked);
-  renderAlertRows($("unverifiedList"),unverified);
+  renderAlertRows(
+    $("highPriorityList"),high
+  );
 
-  text("lockedSummary",
+  renderAlertRows(
+    $("lockedList"),locked
+  );
+
+  renderAlertRows(
+    $("unverifiedList"),unverified
+  );
+
+  text(
+    "lockedSummary",
     `Locked / Completed — ${count(locked)} lineups`
   );
-  text("unverifiedSummary",
+
+  text(
+    "unverifiedSummary",
     `Unverified — ${count(unverified)} lineups`
   );
 
-  text("alertStatus",
+  text(
+    "alertStatus",
     currentDataReady
       ? `Week ${currentNFLWeek} · Current starting lineups. ` +
-        "Missing schedule / bye status remains unverified."
+        "Unverified bye schedules are not treated as confirmed."
       : "Current-week alert classification is unavailable."
   );
 
@@ -1917,8 +2351,12 @@ function renderDashboard() {
 
   const query = $("playerSearch").value
     .trim().toLowerCase();
-  const alertsOnly = $("lineupAlertsOnly").checked;
-  const startersOnly = $("startersOnly").checked;
+
+  const alertsOnly =
+    $("lineupAlertsOnly").checked;
+
+  const startersOnly =
+    $("startersOnly").checked;
 
   const alertedIds = new Set([
     ...groups.high.keys(),
@@ -1934,27 +2372,31 @@ function renderDashboard() {
     (!alertsOnly || alertedIds.has(p.id))
   );
 
-  text("playerStatus",
+  text(
+    "playerStatus",
     `Showing ${filtered.length} of ${players.length} ` +
-    `unique players across ${totals.included} rosters.`
+      `unique players across ${totals.included} rosters.`
   );
 
-  text("exposureSectionSummary",
+  text(
+    "exposureSectionSummary",
     `${filtered.length} of ${players.length} players · ` +
-    `${totals.included} leagues`
+      `${totals.included} leagues`
   );
 
   renderPlayerList(filtered);
 }
 
 // ----------------------------------
-// EVENTS
+// EVENT LISTENERS
 // ----------------------------------
 
 for (let week=1;week<=18;week++) {
   const option = document.createElement("option");
+
   option.value = String(week);
   option.textContent = `Week ${week}`;
+
   $("gameWeek").appendChild(option);
 }
 
@@ -1966,43 +2408,51 @@ $("loadButton").addEventListener(
 
 function setRosterMode(mode) {
   rosterMode = mode;
+
   const current = mode === "current";
 
   $("modeCurrent").classList.toggle(
     "active",current
   );
+
   $("modeWeekly").classList.toggle(
     "active",!current
   );
 
   $("modeCurrent").setAttribute(
-    "aria-pressed",String(current)
+    "aria-pressed",
+    String(current)
   );
+
   $("modeWeekly").setAttribute(
-    "aria-pressed",String(!current)
+    "aria-pressed",
+    String(!current)
   );
 
-  text("benchHeading",
-    current ? "Bench" : "Not Starting"
-  );
-  text("benchLabel",
+  text(
+    "benchHeading",
     current ? "Bench" : "Not Starting"
   );
 
-  text("modeNote",current
-    ? "Latest roster assignments. Scores follow selected week."
-    : "Selected-week historical lineups. " +
-      "Suggestions disabled. Injury data remains current."
+  text(
+    "modeNote",
+    current
+      ? "Latest roster assignments. Scores follow selected week."
+      : "Selected-week historical lineups. Suggestions disabled. " +
+        "Injury designations remain current."
   );
 
   renderDashboard();
 }
 
 $("modeCurrent").addEventListener(
-  "click",() => setRosterMode("current")
+  "click",
+  () => setRosterMode("current")
 );
+
 $("modeWeekly").addEventListener(
-  "click",() => setRosterMode("weekly")
+  "click",
+  () => setRosterMode("weekly")
 );
 
 $("gameWeek").addEventListener("change",() => {
@@ -2023,6 +2473,7 @@ $("gameWeek").addEventListener("change",() => {
 
 $("refreshSchedule").addEventListener("click",() => {
   refreshCurrentWeek();
+
   const version = ++historyVersion;
   loadSelectedSchedule(version);
 });
@@ -2037,12 +2488,16 @@ $("refreshScores").addEventListener("click",() => {
 $("sleeperUsername").addEventListener("input",() => {
   ++accountVersion;
   ++historyVersion;
+
   loadedUsername = "";
   resetDashboard();
 
   $("loadButton").disabled = false;
+
   text("loadButton","Load My Leagues");
-  text("status",
+
+  text(
+    "status",
     "Username changed. Load the new account."
   );
 });
@@ -2051,12 +2506,15 @@ for (const input of document.querySelectorAll(
   "#baseFilters input, #excludeBestBall, #excludeEmptyLeagues"
 )) {
   input.addEventListener(
-    "change",renderDashboard
+    "change",
+    renderDashboard
   );
 }
 
 for (const id of [
-  "playerSearch","lineupAlertsOnly","startersOnly"
+  "playerSearch",
+  "lineupAlertsOnly",
+  "startersOnly"
 ]) {
   $(id).addEventListener(
     id === "playerSearch" ? "input" : "change",
@@ -2064,7 +2522,10 @@ for (const id of [
   );
 }
 
-restoreSleeperUsername();
+// Restore each browser's saved username.
+restoreUsername();
+
+// Initialize current-week and selected-week data.
 refreshCurrentWeek();
 
 const initialVersion = ++historyVersion;
