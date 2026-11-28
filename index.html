@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101319">
-<title>Sleeper Command Center v7.7.4</title>
+<title>Sleeper Command Center v7.7.5</title>
 <style>
 :root {
   color-scheme:dark;
@@ -691,7 +691,7 @@ th{color:var(--muted)}
   }
 }
 
-/* v7.7.4 — season-to-date PPR positional ranking */
+/* v7.7.5 — season-to-date PPR positional ranking */
 .player-name-line {
   display:flex;
   align-items:baseline;
@@ -712,6 +712,27 @@ th{color:var(--muted)}
 .position-k .player-position-rank {color:#a99ad9}
 .position-def .player-position-rank,
 .position-dst .player-position-rank {color:#aab4c2}
+
+/* v7.7.5 - compact full-PPR game log */
+.ppr-chart{--chart-color:#9b91f6;border-top:1px solid var(--border);margin-top:16px;padding-top:14px}
+.position-qb{--chart-color:#d68fb0}.position-rb{--chart-color:#70bea1}
+.position-wr{--chart-color:#79b7dc}.position-te{--chart-color:#d9a665}
+.position-k{--chart-color:#a99ad9}
+.ppr-chart-heading{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.ppr-chart-heading strong{font-size:13px;color:var(--text)}
+.ppr-chart-subtitle{font-size:10px;color:var(--muted)}
+.ppr-chart-plot{min-height:145px;color:var(--muted);font-size:12px}
+.ppr-chart-svg{display:block;width:100%;max-height:180px;overflow:visible;color:var(--chart-color)}
+.ppr-grid{stroke:#4b5260;stroke-width:.6;stroke-dasharray:3 4}
+.ppr-axis{fill:#a0a7b5;font-size:9px}
+.ppr-average{stroke:#a0a7b5;stroke-width:1;stroke-dasharray:5 4;opacity:.65}
+.ppr-line{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.ppr-fill{fill:currentColor;opacity:.09}
+.ppr-dot{fill:currentColor}
+.ppr-high-dot{fill:currentColor;stroke:#f5f6fa;stroke-width:1.5}
+.ppr-low-dot{fill:#f08080;stroke:#f5f6fa;stroke-width:1.5}
+.ppr-chart-footer{display:flex;justify-content:space-between;gap:6px;font-size:11px;font-weight:600;margin:3px 0 5px}
+.ppr-low{color:var(--red)}.ppr-avg{color:var(--muted)}.ppr-high{color:var(--chart-color)}
 
 </style>
 </head>
